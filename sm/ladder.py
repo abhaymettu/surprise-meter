@@ -46,6 +46,7 @@ def run(*cmd, tries=200):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--stop-after", help="finish this run, then stop, so another job can have the machine")
     a = ap.parse_args()
     for j in PLAN:
         d = RUNS / j["name"]
@@ -60,6 +61,8 @@ def main():
             run("sm.evaluate", str(d))
         if not j["window"] and not (d / "xray.json").exists():
             run("sm.xray", str(d))
+        if j["name"] == a.stop_after:
+            return
     if a.list:
         return
     for kind in ("ideal", "cv", "cv0"):
