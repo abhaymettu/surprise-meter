@@ -138,16 +138,16 @@ struct P { n: u32, a: u32, b: u32, c: u32, w: u32, bias: u32, heads: u32, flag: 
 @group(0) @binding(2) var<storage, read> x: array<f32>;
 @group(0) @binding(3) var<storage, read_write> y: array<f32>;
 
-// y[t, o] = sum_i W[o, i] x[t, i] + bias[o]. a = input width, b = output width, flag 1 adds bias.
-@compute @workgroup_size(1) fn linear(@builtin(global_invocation_id) id: vec3u) {
-  let t = id.x;
-  for (var o = 0u; o < p.b; o++) {
-    var s = 0.0;
-    if (p.flag == 1u) { s = W[p.bias + o]; }
-    let wo = p.w + o * p.a; let xo = t * p.a;
-    for (var i = 0u; i < p.a; i++) { s += W[wo + i] * x[xo + i]; }
-    y[t * p.b + o] = s;
-  }
+// y[t, o] = sum_i W[o, i] x[t, i] + bias[o], one invocation per output value so the work spreads across GPU cores.
+// a = input width, b = output width, flag 1 adds bias.
+@compute @workgroup_size(64) fn linear(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= p.n * p.b) { return; }
+  let t = id.x / p.b; let o = id.x % p.b;
+  var s = 0.0;
+  if (p.flag == 1u) { s = W[p.bias + o]; }
+  let wo = p.w + o * p.a; let xo = t * p.a;
+  for (var i = 0u; i < p.a; i++) { s += W[wo + i] * x[xo + i]; }
+  y[id.x] = s;
 }
 
 @compute @workgroup_size(1) fn layernorm(@builtin(global_invocation_id) id: vec3u) {
@@ -254,7 +254,7 @@ export class GpuEngine {
       });
       ops.push({ pipeline: pipe[entry], bg, count });
     };
-    const lin = (src, dst, tokens, nameW, nameB, nIn, nOut) => op("linear", src, dst, tokens, { a: nIn, b: nOut, w: at[nameW], bias: nameB ? at[nameB] : 0, flag: nameB ? 1 : 0 });
+    const lin = (src, dst, tokens, nameW, nameB, nIn, nOut) => op("linear", src, dst, Math.ceil((tokens * nOut) / 64), { n: tokens, a: nIn, b: nOut, w: at[nameW], bias: nameB ? at[nameB] : 0, flag: nameB ? 1 : 0 });
     const norm = (src, dst, g, bb) => op("layernorm", src, dst, n, { a: d, w: at[g], bias: at[bb] });
     const wg32 = (words) => Math.ceil(words / 32);
 
