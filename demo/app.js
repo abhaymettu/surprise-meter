@@ -2,31 +2,24 @@ import { SIZE, NOISE, randomScene, step as stepWorld, render as renderWorld } fr
 import { loadWeights, GpuEngine, CpuEngine } from "./engine.js";
 
 const $ = (id) => document.getElementById(id);
-const TICK_MS = 50, BURN_IN = 4, WINDOW = 12, STRIDE = 4, REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const TICK_MS = 50, BURN_IN = 4, REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---- surprise, as defined in sm/surprise.py ------------------------------------------------------------------------
 
 let nullTable = null;
 
 function evidence(frame, mean, sigma) {
-  const excess = new Float32Array(1024);
+  const excess = new Float32Array(1024), patch = new Float32Array(16);
   for (let i = 0; i < 1024; i++) {
     const z = (frame[i] - mean[i]) / sigma[i];
     excess[i] = 0.5 * (z * z - 1);
-  }
-  const I = new Float32Array(33 * 33);
-  for (let y = 0; y < 32; y++) {
-    let row = 0;
-    for (let x = 0; x < 32; x++) {
-      row += excess[y * 32 + x];
-      I[(y + 1) * 33 + x + 1] = I[y * 33 + x + 1] + row;
-    }
+    patch[((i >> 8) & 3) * 4 + ((i >> 3) & 3)] += excess[i];
   }
   let best = -Infinity, bx = 16, by = 16;
-  for (let y = 0; y + WINDOW <= 32; y += STRIDE) {
-    for (let x = 0; x + WINDOW <= 32; x += STRIDE) {
-      const s = I[(y + WINDOW) * 33 + x + WINDOW] - I[y * 33 + x + WINDOW] - I[(y + WINDOW) * 33 + x] + I[y * 33 + x];
-      if (s > best) { best = s; bx = x + WINDOW / 2; by = y + WINDOW / 2; }
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 3; x++) {
+      const s = patch[y * 4 + x] + patch[y * 4 + x + 1] + patch[(y + 1) * 4 + x] + patch[(y + 1) * 4 + x + 1];
+      if (s > best) { best = s; bx = (x + 1) * 8; by = (y + 1) * 8; }
     }
   }
   return { best, bx, by, excess };

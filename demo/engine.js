@@ -1,6 +1,6 @@
 // The world model's forward step, by hand: one WebGPU compute implementation and one CPU implementation of
 // sm/model.py RecurrentModel.step, with no framework. Both take a 32x32 frame and return the Gaussian over the next one.
-const PATCH = 8, GRID = 4, TOKENS = 16, PDIM = 64, NOISE = 0.15, SIGMA_FLOOR = 0.9 * NOISE;
+const PATCH = 8, GRID = 4, TOKENS = 16, PDIM = 64, HEAD = 129, NOISE = 0.15, SIGMA_FLOOR = 0.9 * NOISE;
 
 export async function loadWeights(url) {
   const [meta, buf] = await Promise.all([fetch(`${url}.json`).then((r) => r.json()), fetch(`${url}.bin`).then((r) => r.arrayBuffer())]);
@@ -33,8 +33,8 @@ function decode(out, xrayOut) {
     const gy = g >> 2, gx = g & 3;
     for (let k = 0; k < PDIM; k++) {
       const y = gy * PATCH + (k >> 3), x = gx * PATCH + (k & 7), at = y * 32 + x;
-      mean[at] = out[g * 128 + k] + 0.25;
-      const raw = out[g * 128 + PDIM + k] - 1;
+      mean[at] = out[g * HEAD + 1 + k] + 0.25;
+      const raw = out[g * HEAD + 1 + PDIM + k] - 1;
       sigma[at] = SIGMA_FLOOR + 0.5 * Math.log1p(Math.exp(raw));
       if (xrayOut) xray[at] = xrayOut[g * PDIM + k] + 0.25;
     }
@@ -123,7 +123,7 @@ export class CpuEngine {
     }
     this.state = layerNorm(x, n, d, T["norm.weight"].data, T["norm.bias"].data);
     const spatial = this.state.subarray(0, TOKENS * d);
-    const out = linear(spatial, TOKENS, T["head.weight"].data, T["head.bias"].data, 128, d);
+    const out = linear(spatial, TOKENS, T["head.weight"].data, T["head.bias"].data, HEAD, d);
     const xr = T["xray.weight"] ? linear(spatial, TOKENS, T["xray.weight"].data, T["xray.bias"].data, PDIM, d) : null;
     return decode(out, xr);
   }
@@ -165,22 +165,18 @@ struct P { n: u32, a: u32, b: u32, c: u32, w: u32, bias: u32, heads: u32, flag: 
   for (var c = 0u; c < d; c++) { y[i * d + c] = 0.0; }
   for (var h = 0u; h < p.heads; h++) {
     let qo = h * dh; let ko = d + h * dh; let vo = 2u * d + h * dh;
+    var score: array<f32, 40>;
     var top = -1e30;
     for (var j = 0u; j < n; j++) {
       var dot = 0.0;
       for (var c = 0u; c < dh; c++) { dot += x[i * 3u * d + qo + c] * x[j * 3u * d + ko + c]; }
-      top = max(top, dot * scale);
+      score[j] = dot * scale;
+      top = max(top, score[j]);
     }
     var z = 0.0;
+    for (var j = 0u; j < n; j++) { score[j] = exp(score[j] - top); z += score[j]; }
     for (var j = 0u; j < n; j++) {
-      var dot = 0.0;
-      for (var c = 0u; c < dh; c++) { dot += x[i * 3u * d + qo + c] * x[j * 3u * d + ko + c]; }
-      z += exp(dot * scale - top);
-    }
-    for (var j = 0u; j < n; j++) {
-      var dot = 0.0;
-      for (var c = 0u; c < dh; c++) { dot += x[i * 3u * d + qo + c] * x[j * 3u * d + ko + c]; }
-      let pr = exp(dot * scale - top) / z;
+      let pr = score[j] / z;
       for (var c = 0u; c < dh; c++) { y[i * d + qo + c] += pr * x[j * 3u * d + vo + c]; }
     }
   }
@@ -231,7 +227,7 @@ export class GpuEngine {
     const buf = (words) => device.createBuffer({ size: words * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
     const b = {
       input: buf(TOKENS * PDIM), seen: buf(n * d), X: buf(n * d), N: buf(n * d), Q: buf(n * 3 * d), A: buf(n * d), P: buf(n * d), H: buf(n * 4 * d), H2: buf(n * 4 * d),
-      state: buf(n * d), out: buf(TOKENS * 128), xray: buf(TOKENS * PDIM),
+      state: buf(n * d), out: buf(TOKENS * HEAD), xray: buf(TOKENS * PDIM),
     };
     this.b = b;
     const mod = device.createShaderModule({ code: WGSL });
@@ -279,9 +275,9 @@ export class GpuEngine {
       op("add", b.P, b.X, wg32(n * d), { n: n * d });
     }
     norm(b.X, b.state, "norm.weight", "norm.bias");
-    lin(b.state, b.out, TOKENS, "head.weight", "head.bias", d, 128);
+    lin(b.state, b.out, TOKENS, "head.weight", "head.bias", d, HEAD);
     if (w.tensors["xray.weight"]) lin(b.state, b.xray, TOKENS, "xray.weight", "xray.bias", d, PDIM);
-    this.readOut = device.createBuffer({ size: TOKENS * 128 * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    this.readOut = device.createBuffer({ size: TOKENS * HEAD * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     this.readX = device.createBuffer({ size: TOKENS * PDIM * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
   }
 
