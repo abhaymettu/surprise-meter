@@ -87,7 +87,7 @@ async function tick() {
   if (!frozen) stepWorld(world);
   if (wantVanish) {
     const b = world.balls.find((b) => b.alive && hiddenFully(b));
-    if (b) { b.alive = false; wantVanish = false; b.goneAt = performance.now(); mark("deleted while hidden"); uiState(); caption("It is gone now, but the model cannot know that. Watch the place it should come out."); expectEmerge = performance.now(); }
+    if (b) { b.alive = false; wantVanish = false; b.goneAt = performance.now(); mark("deleted while hidden"); uiState(); caption("The ball is gone, but the model was not told. Its picture of the ball keeps moving.", 0); }
   }
   respawnIfEmpty();
   renderWorld(world, frame);
@@ -114,7 +114,7 @@ async function tick() {
 
 let emptySince = 0;
 function respawnIfEmpty() {
-  if (world.balls.some((b) => b.alive)) { emptySince = 0; return; }
+  if (attract || world.balls.some((b) => b.alive)) { emptySince = 0; return; }
   if (!emptySince) emptySince = performance.now();
   if (performance.now() - emptySince < 2600) return;
   const r = 2 + Math.random(), a = Math.random() * 6.28, s = 0.3 + Math.random() * 0.5;
@@ -516,7 +516,7 @@ function caption(text, ms = 5200) {
   if (text && ms) capTimer = setTimeout(() => (capEl.style.opacity = 0), ms);
 }
 
-let attract = true, expectEmerge = 0;
+let attract = true;
 function stopAttract() { attract = false; }
 
 function occludedScene() {
@@ -535,25 +535,27 @@ async function attractLoop() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   while (attract) {
     occludedScene();
-    caption("A ball goes behind the slab. The glow is the model's own memory of where it is.", 0);
+    caption("A ball goes behind the slab. The glow is the model's own picture of where it thinks the ball is.", 0);
     let hid = false;
     for (let i = 0; i < 300 && attract && !hid; i++) { await wait(50); hid = world.balls[0].alive && hiddenFully(world.balls[0]); }
     if (!attract) break;
-    await wait(900);
-    if (!attract) break;
-    caption("First pass. It comes out where the model said it would, so the meter stays quiet.", 0);
     for (let i = 0; i < 300 && attract && hiddenFully(world.balls[0]); i++) await wait(50);
-    await wait(3000);
+    if (!attract) break;
+    caption("It comes out about where the glow said it would.", 0);
+    await wait(2600);
     if (!attract) break;
     occludedScene();
-    caption("Second pass. This time the ball will be deleted while it is out of sight.", 0);
+    caption("Again, but this time the ball is deleted once it is out of sight.", 0);
     wantVanish = true;
     uiState();
     for (let i = 0; i < 400 && attract && wantVanish; i++) await wait(50);
     if (!attract) break;
-    await wait(4200);
+    await wait(3600);
     if (!attract) break;
-    caption("That spike is the moment it should have come out and did not. Your turn: drag a ball.", 0);
+    caption("Nothing comes out. With no ball to confirm it, the picture fades. That is how long it held on.", 0);
+    await wait(3400);
+    if (!attract) break;
+    caption("Your turn. Drag a ball somewhere it could not have gone and watch the meter.", 0);
     await wait(4200);
   }
   caption("", 0);
