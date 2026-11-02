@@ -22,7 +22,7 @@ from . import world as W
 from .train import load_model
 
 SCENES = 192
-NULL_CLIPS, NULL_T = 2000, 64
+NULL_CLIPS, NULL_T = 2000, 96
 ALPHAS = [1e-2, 1e-3, 1e-4]
 
 
@@ -38,7 +38,7 @@ class ModelObserver:
             self._step = mx.compile(step)
 
     def _roll(self, frames, state, t0):
-        """Step through frames from index t0, with `state` having seen frame t0 - 1. Returns (B, T) arrays, NaN before t0."""
+        """Score frames t0.. given `state`, which has seen frames up to t0 - 2. Returns (B, T) arrays, NaN before t0."""
         B, T = frames.shape[:2]
         nll, ev = np.full((B, T), np.nan, np.float32), np.full((B, T), np.nan, np.float32)
         x = mx.array(frames)

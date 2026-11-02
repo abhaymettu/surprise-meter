@@ -14,6 +14,7 @@ SIZE = 32  # frames are SIZE x SIZE pixels
 NOISE = 0.04  # std of the iid Gaussian pixel noise added to every rendered frame
 MAX_BALLS = 2
 MAX_OCC = 2
+CROSSING = 0.5  # fraction of occluded scenes that start with a ball heading for the occluder
 
 _YY, _XX = np.meshgrid(np.arange(SIZE) + 0.5, np.arange(SIZE) + 0.5, indexing="ij")
 
@@ -73,8 +74,37 @@ def random_scene(rng, B, n_balls=None, n_occ=None):
     speed = np.exp(rng.uniform(np.log(0.15), np.log(1.4), (B, N)))
     ang = rng.uniform(0, 2 * np.pi, (B, N))
     vel = np.stack([speed * np.cos(ang), speed * np.sin(ang)], -1).astype(np.float32)
-
     pos = rng.uniform(0, 1, (B, N, 2)) * (SIZE - 2 * rad[..., None]) + rad[..., None]
+
+    w = rng.uniform(3, 14, (B, K))
+    x0 = rng.uniform(0, SIZE - w)
+    snap = rng.random((B, K))  # one occluder in five sits flush with a side wall, so bounces happen out of sight
+    x0 = np.where(snap < 0.1, 0.0, np.where(snap < 0.2, SIZE - w, x0))
+    full = rng.random((B, K)) < 0.6
+
+    # Half the scenes with an occluder start a visible ball on course for it, so a clip often shows a ball seen, hidden
+    # and seen again. Everything stays lawful; only the initial conditions are chosen.
+    cross = (rng.random(B) < CROSSING) & (nk >= 1)
+    w[:, 0] = np.where(cross, rng.uniform(6, 14, B), w[:, 0])
+    x0[:, 0] = np.where(snap[:, 0] < 0.2, x0[:, 0], np.minimum(x0[:, 0], SIZE - w[:, 0]))
+    x0[:, 0] = np.where(cross & (snap[:, 0] >= 0.1) & (snap[:, 0] < 0.2), SIZE - w[:, 0], x0[:, 0])
+    full[:, 0] |= cross
+    r = rad[:, 0]
+    room_left, room_right = x0[:, 0] - 2 * r - 1, SIZE - (x0[:, 0] + w[:, 0]) - 2 * r - 1
+    from_left = room_left >= room_right
+    room = np.maximum(room_left, room_right)
+    cross &= room > 0
+    arrive = rng.uniform(2, 8, B)
+    s0 = np.exp(rng.uniform(np.log(0.15), np.log(1.2), B))
+    a0 = rng.uniform(-0.45, 0.45, B)
+    gap = np.minimum(arrive * s0 * np.cos(a0), room)
+    vx0 = np.where(from_left, 1, -1) * s0 * np.cos(a0)
+    xs = np.where(from_left, x0[:, 0] - r - 0.5 - gap, x0[:, 0] + w[:, 0] + r + 0.5 + gap)
+    pos[cross, 0, 0] = xs[cross]
+    pos[cross, 0, 1] = rng.uniform(r + 1, SIZE - r - 1)[cross]
+    vel[cross, 0, 0] = vx0[cross]
+    vel[cross, 0, 1] = (s0 * np.sin(a0))[cross]
+
     # Resolve initial overlap between the two balls by redrawing the second one.
     for _ in range(20):
         d = np.linalg.norm(pos[:, 0] - pos[:, 1], axis=-1)
@@ -84,11 +114,6 @@ def random_scene(rng, B, n_balls=None, n_occ=None):
         pos[bad, 1] = rng.uniform(0, 1, (bad.sum(), 2)) * (SIZE - 2 * rad[bad, 1:2]) + rad[bad, 1:2]
     alive[:, 1] &= np.linalg.norm(pos[:, 0] - pos[:, 1], axis=-1) >= rad[:, 0] + rad[:, 1] + 0.5
 
-    w = rng.uniform(3, 14, (B, K))
-    x0 = rng.uniform(0, SIZE - w)
-    snap = rng.random((B, K))  # one occluder in five sits flush with a side wall, so bounces happen out of sight
-    x0 = np.where(snap < 0.1, 0.0, np.where(snap < 0.2, SIZE - w, x0))
-    full = rng.random((B, K)) < 0.6
     h = np.where(full, SIZE, rng.uniform(10, 28, (B, K)))
     y0 = np.where(full, 0, rng.uniform(0, SIZE - h))
     occ = np.stack([x0, x0 + w, y0, y0 + h], -1).astype(np.float32)
