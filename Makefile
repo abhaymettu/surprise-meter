@@ -5,10 +5,10 @@ results:
 	$(PY) -m sm.analyze
 	$(PY) -m sm.figures
 
-# Run the measurements again from the published weights, then redo the results. About an hour on an M-series Mac.
+# Run the measurements again from the published weights, then redo the results. Hours on an M-series Mac.
 measure: weights
+	for k in ideal causal walls cv cv0 frozen; do $(PY) -m sm.evaluate $$k; done
 	for r in runs/*-s[0-9]; do $(PY) -m sm.evaluate $$r && case $$r in *window*) ;; *) $(PY) -m sm.xray $$r ;; esac; done
-	for k in ideal cv cv0; do $(PY) -m sm.evaluate $$k; done
 	$(MAKE) results
 
 weights:

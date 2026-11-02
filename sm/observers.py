@@ -2,15 +2,19 @@
 
   ideal    knows the lawful continuation of every clip exactly. This is the signal-known-exactly observer of
            detection theory, and no observer can separate the twins better
-  cv       sees every visible ball perfectly, assumes constant velocity and no walls, remembers hidden balls
-  cv0      the same, but a ball out of sight is forgotten
+  causal   knows the laws, the scene, radii and brightness but not where the balls started or how fast: the most any
+           observer can get from the frames themselves. See evaluate.CausalIdeal
+  walls    sees every visible ball perfectly, assumes constant velocity with wall bounces, remembers hidden balls
+  cv       wall-blind dead reckoning: the same with no walls
+  cv0      the same again, but a ball out of sight is forgotten
+  frozen   sees every visible ball perfectly and expects a hidden one to stay where it was last seen
 """
 
 import numpy as np
 
 from . import world as W
 
-KINDS = {"cv": True, "cv0": False}  # memory for hidden balls
+KINDS = {"cv": dict(memory=True), "cv0": dict(memory=False), "walls": dict(memory=True, walls=True), "frozen": dict(memory=True, frozen=True)}
 SEEN = 0.02  # a ball is perceived when at least this fraction of it is visible
 
 
@@ -23,7 +27,7 @@ def render_state(scene, pos, alive):
 
 def predict(traj, vis, kind):
     """Predicted noiseless frames (B, T, H, W); index t is the prediction of frame t made after seeing frame t-1."""
-    memory = KINDS[kind]
+    memory, walls, frozen = KINDS[kind]["memory"], KINDS[kind].get("walls"), KINDS[kind].get("frozen")
     sc = traj.scene
     B, T, N = traj.alive.shape
     pos = np.zeros((B, N, 2), np.float32)
@@ -41,7 +45,12 @@ def predict(traj, vis, kind):
         known = (known | obs) if memory else obs
         prev_pos = np.where(obs[..., None], p, prev_pos)
         prev_obs = obs
-        pos = pos + vel
+        pos = pos + (vel * obs[..., None] if frozen else vel)
+        if walls:
+            lo, hi = sc.rad[..., None], W.SIZE - sc.rad[..., None]
+            flip = (pos < lo) | (pos > hi)
+            pos = np.where(pos < lo, 2 * lo - pos, np.where(pos > hi, 2 * hi - pos, pos))
+            vel = np.where(flip, -vel, vel)
         out[:, t + 1] = render_state(sc, pos, known)
     return out
 

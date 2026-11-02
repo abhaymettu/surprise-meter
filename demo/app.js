@@ -566,7 +566,7 @@ async function attractLoop() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   while (attract) {
     occludedScene();
-    caption("A ball goes behind the slab. The outline is the model's own picture of where it thinks the ball is.", 0);
+    caption("A ball goes behind the slab. The outline is read straight out of the model's state.", 0);
     let hid = false;
     for (let i = 0; i < 300 && attract && !hid; i++) { await wait(50); hid = world.balls[0].alive && hiddenFully(world.balls[0]); }
     if (!attract) break;
@@ -583,7 +583,7 @@ async function attractLoop() {
     if (!attract) break;
     await wait(2400);
     if (!attract) break;
-    caption("Nothing comes out. With no ball to confirm it, the picture fades within about half a second.", 0);
+    caption("Nothing comes out. With no ball to confirm it, the outline fades within about half a second.", 0);
     await wait(2800);
     if (!attract) break;
     newWorld({ balls: 2, occluders: 1 });

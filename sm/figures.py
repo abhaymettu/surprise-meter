@@ -17,6 +17,7 @@ import numpy as np
 
 from . import events as E
 from . import world as W
+from .analyze import falls_through
 
 OUT = Path("results/figures")
 SIZE_STYLE = {
@@ -24,12 +25,18 @@ SIZE_STYLE = {
     "5m": dict(color="#4a7fb5", marker="s", label="5M"),
     "20m": dict(color="#12355b", marker="D", label="20M"),
     "1m-window8": dict(color="#b5651d", marker="^", label="1M, 8-frame window"),
+    "1m-long": dict(color="#9db7d5", marker="v", label="1M, 60000 steps"),
+    "5m-short": dict(color="#4a7fb5", marker="v", label="5M, 10000 steps"),
 }
 OBS_STYLE = {
     "ideal": dict(color="#111111", ls="-", lw=1.1, label="ideal"),
-    "cv": dict(color="#666666", ls="--", lw=1.1, label="dead reckoning"),
+    "causal": dict(color="#111111", ls="-.", lw=1.1, label="causal ideal"),
+    "walls": dict(color="#888888", ls="-", lw=1.1, label="dead reckoning with walls"),
+    "cv": dict(color="#666666", ls="--", lw=1.1, label="wall-blind dead reckoning"),
+    "frozen": dict(color="#aaaaaa", ls=":", lw=1.4, label="frozen at last seen"),
     "cv0": dict(color="#666666", ls=":", lw=1.4, label="no memory"),
 }
+KIN = ["teleport", "deflect", "phantom", "collision", "hidden"]
 READ_AT = {"vanish": "1.0", "rebound": "0.75"}  # the rebound's way back, when the last seen position and the straight line are both wrong
 TITLES = {
     "teleport": "Teleport: a ball jumps along its path",
@@ -98,8 +105,9 @@ def permanence(s, fam, path, title):
         line(ax, D, r["pc"], r["pc_lo"], r["pc_hi"], **SIZE_STYLE[g])
         ends.append((SIZE_STYLE[g]["label"], r["pc"][-1], SIZE_STYLE[g]["color"]))
     for k, o in rec["observers"].items():
-        ax.plot(D, o["pc"], **{**OBS_STYLE[k], "label": None})
-        ends.append((OBS_STYLE[k]["label"], o["pc"][-1], OBS_STYLE[k]["color"]))
+        if k in ("ideal", "walls", "cv", "cv0"):
+            ax.plot(D, o["pc"], **{**OBS_STYLE[k], "label": None})
+            ends.append((OBS_STYLE[k]["label"], o["pc"][-1], OBS_STYLE[k]["color"]))
     ax.axhline(0.5, color="#bbbbbb", lw=0.8, zorder=0)
     ax.set_ylim(-0.03, 1.03)
     ax.set_xlabel("frames hidden")
@@ -111,28 +119,38 @@ def permanence(s, fam, path, title):
     ends = []
     for g in groups(rec, ("1m", "5m", "20m", "1m-window8")):
         r = rec["sizes"][g]
+        if "trace_nats" not in r:
+            continue
         line(ax, D, r["trace_nats"], r["trace_lo"], r["trace_hi"], **SIZE_STYLE[g])
         ends.append((SIZE_STYLE[g]["label"], r["trace_nats"][-1], SIZE_STYLE[g]["color"]))
     ax.axhline(0, color="#bbbbbb", lw=0.8, zorder=0)
     ax.set_xlabel("frames hidden")
-    ax.set_ylabel("seen minus never there (nats)")
+    ax.set_ylabel("seen minus never there (nats per frame)")
     ax.set_title("Trace at identical empty frames")
+    if "exit" in s["families"]:
+        for g in groups(s["families"]["exit"]):
+            ex = s["families"]["exit"]
+            ax.plot(ex["levels"], ex["sizes"][g]["trace_nats"], color=SIZE_STYLE[g]["color"], ls=":", lw=1.2)
+        ax.plot([], [], color="#666666", ls=":", lw=1.2, label="after a visible exit")
     ax.legend(loc="upper right", fontsize=8.5)
 
     ax = axes[2]
     base = None
     ends = []
     for g in groups(rec):
-        x = s["sizes"][g]["xray"][fam][READ_AT[fam]]
-        seeds = np.array(x["err_px_seeds"])
-        line(ax, x["D"], x["err_px"], seeds.min(0), seeds.max(0), **SIZE_STYLE[g])
-        ends.append((SIZE_STYLE[g]["label"], x["err_px"][-1], SIZE_STYLE[g]["color"]))
+        x = s["sizes"][g]["xray"]["position"][fam][READ_AT[fam]]
+        seeds = np.array(x["direct_px_seeds"])
+        line(ax, x["D"], x["direct_px"], seeds.min(0), seeds.max(0), **SIZE_STYLE[g])
+        ends.append((SIZE_STYLE[g]["label"], x["direct_px"][-1], SIZE_STYLE[g]["color"]))
         base = x
     if base:
         ax.plot(base["D"], base["last_seen_px"], color="#666666", ls=":", lw=1.4)
         ax.plot(base["D"], base["line_px"], color="#666666", ls="--", lw=1.1)
         ends.append(("last seen", base["last_seen_px"][-1], "#666666"))
         ends.append(("straight line", base["line_px"][-1], "#666666"))
+        if fam == "rebound":
+            ax.plot(base["D"], base["mid_px"], color="#aaaaaa", ls="-.", lw=1.1)
+            ends.append(("slab middle", base["mid_px"][-1], "#aaaaaa"))
     ax.set_xlabel("frames hidden")
     ax.set_ylabel("position error (px of 32)")
     ax.set_ylim(bottom=-0.15)
@@ -148,12 +166,13 @@ def psychometric(s, path):
     fig, axes = plt.subplots(2, 3, figsize=(12.5, 7), gridspec_kw={"wspace": 0.3, "hspace": 0.42})
     for ax, fam in zip(axes.ravel(), fams):
         rec = s["families"][fam]
-        x = np.array(rec["levels"], float)
+        x = np.array([m for m in rec["levels"] if m > 0], float)
         for g in groups(rec):
             r = rec["sizes"][g]
             line(ax, x, r["pc"], r["pc_lo"], r["pc_hi"], **SIZE_STYLE[g])
         for k, o in rec["observers"].items():
-            ax.plot(x, o["pc"], **OBS_STYLE[k])
+            if k in ("ideal", "causal", "cv", "cv0"):
+                ax.plot(x, o["pc"], **OBS_STYLE[k])
         ax.axhline(0.5, color="#bbbbbb", lw=0.8, zorder=0)
         ax.axhline(0.75, color="#dddddd", lw=0.8, zorder=0)
         ax.set_xscale("log")
@@ -196,20 +215,19 @@ def calibration(s, path):
 
 
 def speed_split(s, path):
-    """Long hidden times come with slow balls. This shows the decision curve at each duration for slower and faster balls."""
+    """Long hidden times come with slow balls, so a pooled crossing mixes speeds. The decision curve within fixed speed bands."""
     rec = s["families"]["vanish"]
     gs = groups(rec)
     fig, axes = plt.subplots(1, len(gs), figsize=(3.6 * len(gs), 3.2), sharey=True, squeeze=False)
-    D = rec["levels"]
+    marks = [("v", "#12355b"), ("o", "#4a7fb5"), ("^", "#9db7d5")]
     for ax, g in zip(axes[0], gs):
-        sp = rec["sizes"][g]["speed"]
-        ax.plot(D, sp["pc_slow"], color="#12355b", marker="v", ms=4, lw=1.6, label="slower half")
-        ax.plot(D, sp["pc_fast"], color="#9db7d5", marker="^", ms=4, lw=1.6, label="faster half")
+        for band, (m, c) in zip(rec["sizes"][g]["speed"], marks):
+            ax.plot(band["levels"], band["pc"], color=c, marker=m, ms=4, lw=1.6, label=f"{band['band'][0]} to {band['band'][1]} px per frame")
         ax.axhline(0.5, color="#bbbbbb", lw=0.8, zorder=0)
         ax.set_title(SIZE_STYLE[g]["label"])
         ax.set_xlabel("frames hidden")
     axes[0, 0].set_ylabel("2AFC proportion correct")
-    axes[0, 0].legend(fontsize=8.5)
+    axes[0, 0].legend(fontsize=8)
     fig.savefig(path)
     plt.close(fig)
 
@@ -237,82 +255,116 @@ def stimuli(path):
     plt.close(fig)
 
 
-def fmt(v, digits=2):
+def fmt(v, digits=2, first=None):
     if v is None or (isinstance(v, float) and not np.isfinite(v)):
         return "not reached"
+    if v == 0 and first is not None:
+        return f"below {first}"
     return f"{v:.{digits}g}"
+
+
+def crossing(v, first, ci=None, last=48):
+    """A crossing of 0 means the curve starts under chance and one at the last level means it never falls through."""
+    word = lambda x: f"below {first}" if x == 0 else f"past {last}" if x >= last else f"{x:.1f}"
+    return word(v) if ci is None or ci[1] == 0 else f"{word(v)} [{word(ci[0])}, {word(ci[1])}]"
 
 
 def tables(s):
     """Every headline number as a markdown table, the source for the README and the paper."""
     lines = ["# Results", "", "Written by `python -m sm.figures` from `results/summary.json`. Brackets are 95% hierarchical bootstrap intervals over seeds and scenes.", ""]
     present = [g for g in ("1m", "5m", "20m") if g in s["sizes"]]
-    lines += ["## Seeds", "", "| size | seeds |", "|---|---|"]
-    for g in s["sizes"]:
-        lines.append(f"| {SIZE_STYLE[g]['label']} | {len(s['sizes'][g]['seeds'])} |")
-    lines += ["", "## Thresholds: magnitude at 75% correct in 2AFC", ""]
-    head = "| family | unit | ideal | dead reckoning | no memory | " + " | ".join(SIZE_STYLE[g]["label"] for g in present) + " |"
-    lines += [head, "|" + "---|" * (head.count("|") - 1)]
-    for fam in ["teleport", "deflect", "phantom", "collision", "hidden"]:
+    every = list(s["sizes"])
+    names = lambda gs: " | ".join(SIZE_STYLE[g]["label"] for g in gs)
+    def table(head, rows):
+        lines.extend([f"| {head} |", "|" + "---|" * (head.count("|") + 1), *[f"| {' | '.join(r)} |" for r in rows], ""])
+    lines += ["## Seeds", ""]
+    table("size | seeds", [[SIZE_STYLE[g]["label"], ", ".join(s["sizes"][g]["seeds"])] for g in every])
+    lines += ["## Thresholds: magnitude at 75% correct in 2AFC", ""]
+    rows = []
+    for fam in KIN:
         rec = s["families"][fam]
-        row = [fam, rec["unit"]] + [fmt(rec["observers"].get(k, {}).get("t_afc")) for k in ("ideal", "cv", "cv0")]
+        first = min(m for m in rec["levels"] if m > 0)
+        row = [fam, rec["unit"]] + [fmt(rec["observers"].get(k, {}).get("t_afc"), first=first) for k in ("ideal", "causal", "walls", "cv", "cv0")]
         for g in present:
             r = rec["sizes"][g]
-            lo, hi = r["t_afc_ci"]
-            row.append(f"{fmt(r['t_afc'])} [{fmt(lo)}, {fmt(hi)}]")
-        lines.append("| " + " | ".join(row) + " |")
-    lines += ["", "## Efficiency against the ideal observer: (ideal threshold / model threshold) squared", ""]
-    head = "| family | " + " | ".join(SIZE_STYLE[g]["label"] for g in present) + " |"
-    lines += [head, "|" + "---|" * (len(present) + 1)]
-    for fam in ["teleport", "deflect", "phantom", "collision", "hidden"]:
-        row = [fam]
-        for g in present:
-            r = s["families"][fam]["sizes"][g]
-            if "efficiency" in r:
-                lo, hi = r["efficiency_ci"]
-                row.append(f"{r['efficiency']:.3g} [{lo:.3g}, {hi:.3g}]")
-            else:
-                row.append("not reached")
-        lines.append("| " + " | ".join(row) + " |")
-    lines += ["", "## Yes/no detection: magnitude detected half the time above false alarms, at one lawful frame in a thousand", ""]
-    head = "| family | unit | ideal | " + " | ".join(SIZE_STYLE[g]["label"] for g in present) + " |"
-    lines += [head, "|" + "---|" * (len(present) + 3)]
-    for fam in ["teleport", "deflect", "phantom", "collision", "hidden"]:
+            row.append(f"{fmt(r['t_afc'])} [{fmt(r['t_afc_ci'][0])}, {fmt(r['t_afc_ci'][1])}]")
+        rows.append(row)
+    table("family | unit | told the state | causal ideal | dead reckoning with walls | wall-blind | no memory | " + names(present), rows)
+    for title, key in (("Efficiency against the causal ideal: (its threshold / the model's) squared", "efficiency_causal"), ("Efficiency against the observer told the exact state", "efficiency")):
+        lines += [f"## {title}", ""]
+        rows = []
+        for fam in KIN:
+            row = [fam]
+            for g in present:
+                r = s["families"][fam]["sizes"][g]
+                row.append(f"{r[key]:.3g} [{r[key + '_ci'][0]:.3g}, {r[key + '_ci'][1]:.3g}]" if key in r else "not reached")
+            rows.append(row)
+        table("family | " + names(present), rows)
+    lines += ["## Yes/no detection: magnitude detected half the time above false alarms, at one lawful frame in a thousand", ""]
+    table("family | unit | told the state | " + names(present), [[fam, s["families"][fam]["unit"], fmt(s["families"][fam]["observers"].get("ideal", {}).get("t_det"))] + [fmt(s["families"][fam]["sizes"][g]["t_det"]) for g in present] for fam in KIN])
+    lines += ["## Hidden time where the 2AFC falls through chance, frames", ""]
+    groups_d = [g for g in every if "crossing" in s["families"]["vanish"]["sizes"][g]]
+    rows = []
+    for fam in ("vanish", "rebound"):
         rec = s["families"][fam]
-        lines.append("| " + " | ".join([fam, rec["unit"], fmt(rec["observers"].get("ideal", {}).get("t_det"))] + [fmt(rec["sizes"][g]["t_det"]) for g in present]) + " |")
-    lines += ["", "## Hidden time, in frames", ""]
-    head = "| family | measure | " + " | ".join(SIZE_STYLE[g]["label"] for g in s["sizes"]) + " |"
-    lines += [head, "|" + "---|" * (len(s["sizes"]) + 2)]
-    for fam in ["vanish", "rebound"]:
-        rec = s["families"][fam]
-        for name, key in (("2AFC falls through chance", "crossing"), ("trace reaches half its first value", "trace_half")):
-            row = [fam, name]
-            for g in s["sizes"]:
-                r = rec["sizes"][g]
-                lo, hi = r[key + "_ci"]
-                row.append(f"{r[key]:.1f} [{lo:.1f}, {hi:.1f}]")
-            lines.append("| " + " | ".join(row) + " |")
-    lines += ["", "## Reference observers on hidden events: 2AFC at the shortest and longest durations", "", "| family | observer | shortest | longest |", "|---|---|---|---|"]
-    for fam in ["vanish", "rebound"]:
-        rec = s["families"][fam]
-        for k, o in rec["observers"].items():
-            lines.append(f"| {fam} | {OBS_STYLE[k]['label']} | {o['pc'][0]:.3f} | {o['pc'][-1]:.3f} |")
-    lines += ["", "## Decoded position while hidden (px, median over scenes, mean over seeds)", ""]
-    for fam in ["vanish", "rebound"]:
-        lines += [f"### {fam}, read {float(READ_AT[fam]):.0%} of the way through the hidden interval", ""]
-        head = "| D | " + " | ".join(SIZE_STYLE[g]["label"] for g in present) + " | last seen | straight line |"
-        lines += [head, "|" + "---|" * (len(present) + 3)]
-        at = READ_AT[fam]
-        x0 = s["sizes"][present[0]]["xray"][fam][at]
-        for i, D in enumerate(x0["D"]):
-            row = [str(D)] + [f"{s['sizes'][g]['xray'][fam][at]['err_px'][i]:.2f}" for g in present] + [f"{x0['last_seen_px'][i]:.2f}", f"{x0['line_px'][i]:.2f}"]
-            lines.append("| " + " | ".join(row) + " |")
-        lines.append("")
-    lines += ["## Calibration on held-out lawful frames: measured rate where one in a thousand was promised", "", "| size | all | quiet | edge | contact | reveal |", "|---|---|---|---|---|---|"]
-    for g in present:
-        rep = s["sizes"][g]["calibration"]
-        cell = lambda key: f"{np.mean([r[key]['0.001'] for r in rep]):.5f}"
-        lines.append(f"| {SIZE_STYLE[g]['label']} | {cell('fa_test')} | {cell('fa_quiet')} | {cell('fa_edge')} | {cell('fa_contact')} | {cell('fa_reveal')} |")
+        first = rec["levels"][0]
+        for name, key in (("3 px of the reveal", "crossing"), ("full emergence", "crossing_full")):
+            rows.append([fam, name] + [crossing(rec["sizes"][g][key], first, rec["sizes"][g][key + "_ci"]) for g in groups_d])
+        rows.append([fam, "trace halves, per frame"] + [crossing(rec["sizes"][g]["trace_half"], first, rec["sizes"][g]["trace_half_ci"]) for g in groups_d])
+    table("family | measure | " + names(groups_d), rows)
+    lines += ["The same crossing for the observers, which have no learned state:", ""]
+    known = [k for k in ("ideal", "causal", "walls", "cv", "frozen", "cv0") if k in s["families"]["vanish"]["observers"]]
+    table("family | window | " + " | ".join(OBS_STYLE[k]["label"] for k in known), [[fam, window] + [crossing(falls_through(np.array(s["families"][fam]["observers"][k][key]), s["families"][fam]["levels"], 0.5), s["families"][fam]["levels"][0]) for k in known] for fam in ("vanish", "rebound") for window, key in (("3 px", "pc"), ("full", "pc_full"))])
+    lines += ["## The same state read two ways, scored by the same likelihood: crossing in frames", ""]
+    gx = [g for g in present if s["sizes"][g]["xray"]]
+    rows = []
+    for fam in ("vanish", "rebound"):
+        for name, key in (("head", "head"), ("head's mean at the world's noise", "mean"), ("ridge to the next frame", "refit"), ("linear read through decoded slabs", "read")):
+            for window, w in (("3 px", ""), ("full", "_full")):
+                d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
+                rows.append([fam, f"{name}, {window}"] + [crossing(x[key + w + "_crossing"], 4, x[key + w + "_crossing_ci"]) for x in d])
+        for name, key in (("head's mean minus head", "mean"), ("ridge to the next frame minus head", "refit"), ("linear read minus head", "read")):
+            for window, w in (("3 px", ""), ("full", "_full")):
+                d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
+                rows.append([fam, f"{name}, {window}"] + [f"{x[f'{key}_minus_head{w}']:+.1f} [{x[f'{key}_minus_head{w}_ci'][0]:+.1f}, {x[f'{key}_minus_head{w}_ci'][1]:+.1f}]" for x in d])
+    table("family | scored by | " + names(gx), rows)
+    lines += ["## Taking directions out of the state while hidden: the head's 2AFC", ""]
+    rows = []
+    for fam in ("vanish", "rebound"):
+        for g in gx:
+            d = s["sizes"][g]["xray"]["decisions"][fam]
+            for i, D in enumerate(d["head_without_read_4"]["D"]):
+                rows.append([fam, SIZE_STYLE[g]["label"], str(D), f"{d['head'][d['D'].index(D)]:.3f}"] + [f"{d[f'head_without_{n}_{k}']['pc'][i]:.3f}" for k in (4, 16) for n in ("read", "random")])
+    table("family | size | D | intact | read's top 4 removed | random 4 removed | read's top 16 removed | random 16 removed", rows)
+    lines += ["Share of the state's variance on hidden frames that those directions carry:", ""]
+    table("size | directions | how many | share", [[SIZE_STYLE[g]["label"], r["directions"], str(r["k"]), f"{np.mean([x[i]['variance_share'] for x in s['sizes'][g]['xray']['ablated_variance']]):.3f}"] for g in gx for i, r in enumerate(s["sizes"][g]["xray"]["ablated_variance"][0])])
+    lines += ["## Decoded position while hidden: linear read straight to position (px, median over scenes, mean over seeds)", ""]
+    for fam in ("vanish", "rebound"):
+        lines += [f"### {fam}, read {float(READ_AT[fam]):.0%} of the way through", ""]
+        x0 = s["sizes"][gx[0]]["xray"]["position"][fam][READ_AT[fam]]
+        rows = [[str(D)] + [f"{s['sizes'][g]['xray']['position'][fam][READ_AT[fam]]['direct_px'][i]:.2f}" for g in gx] + [f"{x0['last_seen_px'][i]:.2f}", f"{x0['line_px'][i]:.2f}", f"{x0['mid_px'][i]:.2f}"] for i, D in enumerate(x0["D"])]
+        table("D | " + names(gx) + " | last seen | straight line | slab middle", rows)
+    lines += ["## Following the unseen bounce: motion along x, read against truth", ""]
+    rows = []
+    for g in gx:
+        for i, st in enumerate(s["sizes"][g]["xray"]["strokes"][0]):
+            for leg in ("outward", "return"):
+                rows.append([SIZE_STYLE[g]["label"], str(st["D"]), leg, f"{np.mean([r[i][leg]['sign_agreement'] for r in s['sizes'][g]['xray']['strokes']]):.2f}", f"{np.mean([r[i][leg]['slope'] for r in s['sizes'][g]['xray']['strokes']]):.2f}"])
+    table("size | D | leg | direction right | slope", rows)
+    for name, rec in s.get("set_aside", {}).items():
+        lines += [f"## {name}, watched while the analysis was built and so left out of its group: crossing in frames", ""]
+        table("family | 3 px | full emergence", [[fam, crossing(rec[fam], s["families"][fam]["levels"][0]), crossing(rec[fam + "_full"], s["families"][fam]["levels"][0])] for fam in ("vanish", "rebound")])
+    lines += ["## Speed bands, vanish: crossing in frames", ""]
+    table("band, px per frame | " + names(present), [[f"{b['band'][0]} to {b['band'][1]}"] + [crossing(s["families"]["vanish"]["sizes"][g]["speed"][i]["crossing"], b["levels"][0]) for g in present] for i, b in enumerate(s["families"]["vanish"]["sizes"][present[0]]["speed"])])
+    lines += ["## Restitution where the model's likelihood peaks (the world's is 1)", ""]
+    table("size | restitution | by seed", [[SIZE_STYLE[g]["label"], f"{1 - s['families']['collision']['sizes'][g]['peak_error']:.2f}", ", ".join(f"{1 - x:.2f}" for x in s["families"]["collision"]["sizes"][g]["peak_error_seeds"])] for g in present])
+    lines += ["## A ball passing through a wall: pairs favouring the lawful twin", ""]
+    table("size | proportion", [[SIZE_STYLE[g]["label"], f"{s['families']['passthrough']['sizes'][g]['pc'][0]:.2f}"] for g in present])
+    lines += ["## Calibration on held-out lawful frames from the training generator: measured rate where one in a thousand was promised", ""]
+    table("size | all | quiet | edge | contact | reveal", [[SIZE_STYLE[g]["label"]] + [f"{np.mean([r[k]['0.001'] for r in s['sizes'][g]['calibration']]):.5f}" for k in ("fa_test", "fa_quiet", "fa_edge", "fa_contact", "fa_reveal")] for g in present])
+    lines += ["## The same, by time since the start of a clip (training clips are 64 frames)", ""]
+    bins = list(s["sizes"][present[0]]["calibration"][0].get("long_rollout", {}))
+    table("size | " + " | ".join(bins), [[SIZE_STYLE[g]["label"]] + [f"{np.mean([r['long_rollout'][b]['0.001'] for r in s['sizes'][g]['calibration']]):.5f}" for b in bins] for g in present])
     Path("results/tables.md").write_text("\n".join(lines) + "\n")
 
 

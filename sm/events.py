@@ -11,6 +11,7 @@ Each family puts its event inside the training distribution's range of speeds, s
   vanish       a ball hidden for D frames behind an occluder never comes out
   hidden       a ball hidden for D frames jumps d px along its path while out of sight
   rebound      a ball bounces off a wall behind an occluder, hidden for D frames, and never comes back
+  exit         a ball leaves through the wall in plain view, D frames before the scored empty frames: the trace's null
 """
 
 from dataclasses import dataclass, replace
@@ -21,6 +22,8 @@ from . import world as W
 
 CONTROL_CLIPS = 192
 REVEAL_PX = 3.0  # an occluded event is scored until the lawful ball has come this far out
+REVEAL_FULL_PX = 9.0  # and again through full emergence: within 3 px "late" still explains an empty frame
+HIDDEN_D_MAX = 3.0  # hidden jumps of every size use scenes that fit the largest, so speed does not change with the level
 
 
 @dataclass
@@ -36,6 +39,8 @@ class Pairs:
     law_vis: np.ndarray  # (B, T, N) visible fraction
     imp_vis: np.ndarray
     window: np.ndarray  # (B, 2) [start, end) frames scored by the 2AFC
+    window_full: np.ndarray = None  # occluded events: the same start, through full emergence
+    sign: np.ndarray = None  # (B,) direction of a signed edit
 
 
 def _unit(v):
@@ -61,7 +66,7 @@ def _first_diff(law_clean, imp_clean):
     return np.where(diff.any(1), diff.argmax(1), law_clean.shape[1])
 
 
-def _finish(family, mag, dur, sc, law, imp, rng_noise_seed, length):
+def _finish(family, mag, dur, sc, law, imp, rng_noise_seed, length, length_full=None, sign=None):
     law_clean, law_vis = W.render(law)
     imp_clean, imp_vis = W.render(imp)
     noise = np.random.default_rng(rng_noise_seed).normal(0, W.NOISE, law_clean.shape).astype(np.float32)
@@ -71,7 +76,8 @@ def _finish(family, mag, dur, sc, law, imp, rng_noise_seed, length):
     if dur:
         none = W.simulate(replace(sc, alive=np.zeros_like(sc.alive)), law_clean.shape[1])
         control = W.render(none)[0][:CONTROL_CLIPS] + noise[:CONTROL_CLIPS]
-    return Pairs(family, mag, dur, law_clean + noise, imp_clean + noise, control, law, imp, law_vis, imp_vis, win)
+    full = win if length_full is None else np.stack([td, np.minimum(td + length_full, law_clean.shape[1])], -1)
+    return Pairs(family, mag, dur, law_clean + noise, imp_clean + noise, control, law, imp, law_vis, imp_vis, win, full, sign)
 
 
 def _collect(rng, B, propose):
@@ -115,7 +121,7 @@ def teleport(rng, B, d, t_e=12, T=20):
     sc, ex = _collect(rng, B, propose)
     law = W.simulate(sc, T)
     imp = W.simulate(sc, T, [W.Edit(np.full(B, t_e), jump(ex["sign"]))])
-    return _finish("teleport", d, 0, sc, law, imp, rng.integers(1 << 31), 6)
+    return _finish("teleport", d, 0, sc, law, imp, rng.integers(1 << 31), 6, sign=ex["sign"])
 
 
 def deflect(rng, B, deg, t_e=10, T=22):
@@ -139,7 +145,7 @@ def deflect(rng, B, deg, t_e=10, T=22):
     sc, ex = _collect(rng, B, propose)
     law = W.simulate(sc, T)
     imp = W.simulate(sc, T, [W.Edit(np.full(B, t_e), turn(ex["sign"]))])
-    return _finish("deflect", deg, 0, sc, law, imp, rng.integers(1 << 31), 10)
+    return _finish("deflect", deg, 0, sc, law, imp, rng.integers(1 << 31), 10, sign=ex["sign"])
 
 
 def _wall_scene(rng, n, t_hit=12):
@@ -162,7 +168,7 @@ def _wall_scene(rng, n, t_hit=12):
     return sc, side
 
 
-def _wall_family(rng, B, family, change, T=26, length=8):
+def _wall_family(rng, B, family, change, T=26, length=8, settled=26):
     def edit(side):
         def fn(st, rows):
             change(st["walls"], rows, side[rows])
@@ -173,7 +179,7 @@ def _wall_family(rng, B, family, change, T=26, length=8):
         sc, side = _wall_scene(rng, n)
         law = W.simulate(sc, T)
         imp = W.simulate(sc, T, [W.Edit(np.zeros(n, int), edit(side))])
-        ok = (law.bounced[:, 4:].sum((1, 2)) == 1) & (imp.bounced[:, 4:].sum((1, 2)) <= 1)
+        ok = (law.bounced[:, 4:settled].sum((1, 2)) == 1) & (imp.bounced[:, 4:settled].sum((1, 2)) <= 1)
         return sc, ok, {"side": side}
 
     sc, ex = _collect(rng, B, propose)
@@ -225,7 +231,7 @@ def _occluded_scene(rng, n, D, d_min=0.0):
     sc.vel[flip, 0, 0] *= -1
     o = sc.occ[flip, 0].copy()
     sc.occ[flip, 0, 0], sc.occ[flip, 0, 1] = W.SIZE - o[:, 1], W.SIZE - o[:, 0]
-    T = int(np.ceil(a.max())) + D + 8 + int(np.ceil(REVEAL_PX / vx.min()))
+    T = int(np.ceil(a.max())) + D + 8 + int(np.ceil(REVEAL_FULL_PX / vx.min()))
     return sc, feasible, T
 
 
@@ -272,12 +278,12 @@ def _rebound_scene(rng, n, D, d_min=0.0):
     o = sc.occ[flip, 0].copy()
     sc.occ[flip, 0, 0], sc.occ[flip, 0, 1] = W.SIZE - o[:, 1], W.SIZE - o[:, 0]
     live = vx[feasible] if feasible.any() else np.array([1.0])
-    T = int(np.ceil(np.where(feasible, a, 0).max())) + D + 8 + int(np.ceil(REVEAL_PX / live.min()))
+    T = int(np.ceil(np.where(feasible, a, 0).max())) + D + 8 + int(np.ceil(REVEAL_FULL_PX / live.min()))
     return sc, feasible, T
 
 
-def _reveal_frames(sc):
-    return np.ceil(REVEAL_PX / np.abs(sc.vel[:, 0, 0])).astype(int)
+def _reveal_frames(sc, px=REVEAL_PX):
+    return np.ceil(px / np.abs(sc.vel[:, 0, 0])).astype(int)
 
 
 def _occlusion_family(rng, B, D, family, edit_fn, d_min=0.0, scene_fn=None, bounces=0):
@@ -310,7 +316,7 @@ def vanish(rng, B, D):
         st["alive"][rows, 0] = False
 
     sc, law, imp, length = _occlusion_family(rng, B, D, "vanish", fn)
-    return _finish("vanish", D, D, sc, law, imp, rng.integers(1 << 31), length)
+    return _finish("vanish", D, D, sc, law, imp, rng.integers(1 << 31), length, _reveal_frames(sc, REVEAL_FULL_PX))
 
 
 def hidden(rng, B, D, d):
@@ -319,8 +325,8 @@ def hidden(rng, B, D, d):
     def fn(st, rows):
         st["pos"][rows, 0] += (sign[rows] * d)[:, None] * _unit(st["vel"][rows, 0])
 
-    sc, law, imp, length = _occlusion_family(rng, B, D, "hidden", fn, d_min=d)
-    return _finish("hidden", d, D, sc, law, imp, rng.integers(1 << 31), length + int(np.ceil(d / 0.15)))
+    sc, law, imp, length = _occlusion_family(rng, B, D, "hidden", fn, d_min=HIDDEN_D_MAX)
+    return _finish("hidden", d, D, sc, law, imp, rng.integers(1 << 31), length + int(np.ceil(HIDDEN_D_MAX / 0.15)), sign=sign)
 
 
 def rebound(rng, B, D):
@@ -328,7 +334,22 @@ def rebound(rng, B, D):
         st["alive"][rows, 0] = False
 
     sc, law, imp, length = _occlusion_family(rng, B, D, "rebound", fn, scene_fn=_rebound_scene, bounces=1)
-    return _finish("rebound", D, D, sc, law, imp, rng.integers(1 << 31), length)
+    return _finish("rebound", D, D, sc, law, imp, rng.integers(1 << 31), length, _reveal_frames(sc, REVEAL_FULL_PX))
+
+
+def exit_(rng, B, D, length=8):
+    """Nothing is hidden here. If the empty frames still cost more than frames that never held a ball, that is not memory
+    of a hidden object, and the occluded families' trace has to be read against it."""
+
+    def change(walls, rows, side):
+        walls[rows, 0, side] = np.where(side % 2 == 0, -1e4, 1e4)
+
+    sc, law, imp, _ = _wall_family(rng, B, "exit", change, T=32 + D + length)
+    p = _finish("exit", D, D, sc, law, imp, rng.integers(1 << 31), length)
+    gone = np.array([np.nonzero(v[4:] < 1e-3)[0][0] + 4 for v in p.imp_vis[:, :, 0]])
+    p.window = np.stack([gone + D, gone + D + length], -1)
+    p.window_full = p.window
+    return p
 
 
 def _collision_scene(rng, n, t_hit=11):
@@ -351,7 +372,8 @@ def _collision_scene(rng, n, t_hit=11):
 
 
 def collision(rng, B, m, T=24, length=8):
-    """Restitution 1 - m: m = 0 lawful, m = 1 the balls stick along the contact normal, m = 2 they pass through."""
+    """Restitution 1 - m: m = 0 lawful, m = 1 the balls stick along the contact normal, m = 2 they pass through, m < 0
+    harder than elastic. The sign matters: under matched noise a directional bias shows as a constant proportion correct."""
 
     def ball_ok(traj, n):
         contact = traj.bounced[:, 5:T].any(-1)
@@ -379,8 +401,9 @@ FAMILIES = {
     "deflect": dict(fn=deflect, levels=[0.12, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 180], unit="deg"),
     "phantom": dict(fn=phantom, levels=[0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0], unit="px"),
     "passthrough": dict(fn=passthrough, levels=[1.0], unit=""),
-    "collision": dict(fn=collision, levels=[0.003, 0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0], unit="restitution error"),
+    "collision": dict(fn=collision, levels=[-0.5, -0.25, -0.1, -0.03, -0.01, -0.003, 0.003, 0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0], unit="restitution error"),
     "vanish": dict(fn=vanish, levels=[1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48], unit="frames"),
     "rebound": dict(fn=rebound, levels=[6, 8, 12, 16, 20, 24, 28, 32, 40, 48], unit="frames"),
+    "exit": dict(fn=exit_, levels=[1, 4, 8, 16, 24, 32, 48], unit="frames"),
     "hidden": dict(fn=lambda rng, B, d: hidden(rng, B, 12, d), levels=[0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 3.0], unit="px"),
 }

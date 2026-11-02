@@ -83,7 +83,7 @@ def test_threshold_fit_recovers_a_known_curve():
 
 
 def test_threshold_reports_unbracketed_curves_as_such():
-    assert A.fit_threshold([1, 2, 4], [0.5, 0.55, 0.6], 100, 0.5, 0.75)[0] == float("inf")
+    assert A.fit_threshold([1, 2, 4], [0.5, 0.55, 0.6], 100, None, 0.75)[0] == float("inf")
     assert A.fit_threshold([1, 2, 4], [0.8, 0.9, 1.0], 100, 0.5, 0.75)[0] == 0.0
 
 
@@ -98,3 +98,19 @@ def test_noise_is_the_constant_the_browser_uses():
     from pathlib import Path
     for f in ("demo/world.js", "demo/engine.js"):
         assert float(re.search(r"NOISE = ([0-9.]+)", Path(f).read_text()).group(1)) == W.NOISE
+
+
+def test_reader_gap_finds_the_longer_lasting_reader():
+    levels = [4, 8, 12, 16, 20, 24]
+    rng = np.random.default_rng(0)
+    def margin(cross):
+        return {D: np.where(rng.random(200) < (0.95 if D < cross else 0.05), 1.0, -1.0) for D in levels}
+    seeds = []
+    for _ in range(2):
+        head, read, mean, refit = margin(10), margin(18), margin(10), margin(10)
+        seeds.append({f"vanish/{D}/{k}{w}": curve[D] for D in levels for k, curve in (("head", head), ("mean", mean), ("refit", refit), ("read", read)) for w in ("", "_full")})
+    out = A.reader_gaps(seeds, "vanish", levels, np.random.default_rng(1))
+    assert 8 <= out["head_crossing"] <= 12
+    assert 16 <= out["read_crossing"] <= 20
+    assert out["read_minus_head_ci"][0] > 0
+    assert abs(out["mean_minus_head"]) < 3

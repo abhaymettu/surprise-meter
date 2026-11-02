@@ -2,7 +2,7 @@
 
   surprisal   h_t = -log p(x_t | x_<t), nats, summed over pixels. Comparing h across matched twins is a log
               Bayes factor between the two worlds: positive means the observer found the impossible twin less
-              likely. This is the bias-free 2AFC readout.
+              likely. This is the criterion-free 2AFC readout; it does not remove a directional bias in the model.
   excess      a patch's surprisal minus the entropy the observer itself predicted for that patch. Near zero when
               the observer is calibrated and the patch is lawful, large only where it was confident and wrong.
   evidence    m_t, the largest excess over any 2x2 block of patches (16x16 pixels). A violation is local, so
