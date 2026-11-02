@@ -16,7 +16,7 @@ A reviewer's scripts produced rough versions of most measures below on `5m-s0`. 
 | Controls | `1m-window8-s0`, `5m-short-s0`, `1m-long-s0` | Known memory length; 5M at 10000 steps; 1M at 60000 steps |
 | Confirmatory | `5m-s1` to `s4`, `20m-s0` to `s2` | Not trained or looked at before the freeze |
 
-Every 5M number comes from confirmatory seeds only. `5m-s0` is set aside and printed once, so shrinkage is visible. 1M gets no new seeds, because its crossings already agree within about 0.2 frames, so the 1M side of each size comparison stays exploratory.
+Every 5M number comes from confirmatory seeds only. `5m-s0` is set aside and printed once, so shrinkage is visible. 1M gets no new seeds, because its vanish crossings already span only 2.5 to 2.9 frames, so the 1M side of each size comparison stays exploratory.
 
 If time runs out, runs are dropped in this order: `20m-s2`, `20m-s1`, `5m-s4`, `5m-s3`. The bare minimum for a size claim is two confirmatory 5M seeds and one 20M seed. A group with one seed has intervals over scenes only, and the text will say so.
 
