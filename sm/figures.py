@@ -90,7 +90,7 @@ def permanence(s, fam, path, title):
     """The same memory read three ways: the decision, the graded trace, and a linear decode of the state."""
     rec = s["families"][fam]
     D = np.array(rec["levels"])
-    fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.6), gridspec_kw={"wspace": 0.42})
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.7), gridspec_kw={"wspace": 0.62})
     ax = axes[0]
     ends = []
     for g in groups(rec):
@@ -103,7 +103,7 @@ def permanence(s, fam, path, title):
     ax.axhline(0.5, color="#bbbbbb", lw=0.8, zorder=0)
     ax.set_ylim(-0.03, 1.03)
     ax.set_xlabel("frames hidden")
-    ax.set_ylabel("share of pairs where the lawful twin is favoured")
+    ax.set_ylabel("pairs favouring the lawful twin")
     ax.set_title("Decision")
     end_labels(ax, ends)
 
@@ -115,25 +115,29 @@ def permanence(s, fam, path, title):
         ends.append((SIZE_STYLE[g]["label"], r["trace_nats"][-1], SIZE_STYLE[g]["color"]))
     ax.axhline(0, color="#bbbbbb", lw=0.8, zorder=0)
     ax.set_xlabel("frames hidden")
-    ax.set_ylabel("surprisal, ball seen minus never there (nats)")
+    ax.set_ylabel("seen minus never there (nats)")
     ax.set_title("Trace at identical empty frames")
     ax.legend(loc="upper right", fontsize=8.5)
 
     ax = axes[2]
     base = None
+    ends = []
     for g in groups(rec):
         x = s["sizes"][g]["xray"][fam][READ_AT[fam]]
         seeds = np.array(x["err_px_seeds"])
         line(ax, x["D"], x["err_px"], seeds.min(0), seeds.max(0), **SIZE_STYLE[g])
+        ends.append((SIZE_STYLE[g]["label"], x["err_px"][-1], SIZE_STYLE[g]["color"]))
         base = x
     if base:
-        ax.plot(base["D"], base["last_seen_px"], color="#666666", ls=":", lw=1.4, label="last seen position")
-        ax.plot(base["D"], base["line_px"], color="#666666", ls="--", lw=1.1, label="straight line from there")
+        ax.plot(base["D"], base["last_seen_px"], color="#666666", ls=":", lw=1.4)
+        ax.plot(base["D"], base["line_px"], color="#666666", ls="--", lw=1.1)
+        ends.append(("last seen", base["last_seen_px"][-1], "#666666"))
+        ends.append(("straight line", base["line_px"][-1], "#666666"))
     ax.set_xlabel("frames hidden")
-    ax.set_ylabel("error in decoded position (px, frame is 32)")
-    ax.set_ylim(bottom=0)
-    ax.set_title("Linear read of the state" + ("" if READ_AT[fam] == "1.0" else ", three quarters of the way through"))
-    ax.legend(loc="upper left", fontsize=8.5)
+    ax.set_ylabel("position error (px of 32)")
+    ax.set_ylim(bottom=-0.15)
+    ax.set_title("Linear read of the state" + ("" if READ_AT[fam] == "1.0" else ", 3/4 of the way"))
+    end_labels(ax, ends)
     fig.suptitle(title, x=0.125, y=1.02, ha="left", fontsize=12, fontweight="bold")
     fig.savefig(path)
     plt.close(fig)
@@ -293,7 +297,7 @@ def tables(s):
         rec = s["families"][fam]
         for k, o in rec["observers"].items():
             lines.append(f"| {fam} | {OBS_STYLE[k]['label']} | {o['pc'][0]:.3f} | {o['pc'][-1]:.3f} |")
-    lines += ["", "## Decoded position at the end of the hidden interval (px, median over scenes, mean over seeds)", ""]
+    lines += ["", "## Decoded position while hidden (px, median over scenes, mean over seeds)", ""]
     for fam in ["vanish", "rebound"]:
         lines += [f"### {fam}, read {float(READ_AT[fam]):.0%} of the way through the hidden interval", ""]
         head = "| D | " + " | ".join(SIZE_STYLE[g]["label"] for g in present) + " | last seen | straight line |"
