@@ -33,6 +33,7 @@ ALPHAS = [1e-2, 1e-3, 1e-4]
 class ModelObserver:
     def __init__(self, model):
         self.model = model
+        self.chunk = 128 if isinstance(model, M.RecurrentModel) else 16  # window attention is clips x (frames x tokens)^2
         if isinstance(model, M.RecurrentModel):
             def step(state, patches, target):
                 state, mean, sigma, logit = model.step(state, patches)
@@ -55,7 +56,7 @@ class ModelObserver:
 
     def score(self, frames):
         """(B, T, H, W) -> surprisal and evidence (B, T); frame 0 has no prediction."""
-        out = [self._score(frames[i : i + 128]) for i in range(0, len(frames), 128)]
+        out = [self._score(frames[i : i + self.chunk]) for i in range(0, len(frames), self.chunk)]
         return np.concatenate([o[0] for o in out]), np.concatenate([o[1] for o in out])
 
     def _score(self, frames):

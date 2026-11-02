@@ -1,8 +1,10 @@
 """The instrument, checked without any trained model: twins, the ideal observer, the null and the thresholds."""
 
 import mlx.core as mx
+import mlx.nn as nn
 import numpy as np
 import pytest
+from mlx.utils import tree_flatten
 
 from sm import analyze as A
 from sm import events as E
@@ -117,6 +119,31 @@ def test_reader_gap_finds_the_longer_lasting_reader():
     assert out["read_minus_head_ci"][0] > 0
     assert abs(out["mean_minus_head"]) < 3
 
+
+
+def test_rebuilding_frames_for_the_backward_pass_leaves_the_gradient_alone():
+    frames = mx.array(np.random.default_rng(0).normal(0.25, 0.15, (2, 6, 32, 32)).astype(np.float32))
+    blank = mx.zeros((2, 5, M.TOKENS))
+    grads = []
+    for recompute in (0, 4):
+        mx.random.seed(0)
+        model = M.RecurrentModel(M.Config(d=32, layers=2, heads=2, recompute=recompute))
+        grads.append(tree_flatten(nn.value_and_grad(model, lambda m: M.frame_nll(m, frames, blank).mean())(model)[1]))
+    assert len(grads[0]) > 0
+    for (name, a), (_, b) in zip(*grads):
+        assert np.allclose(np.array(a), np.array(b), atol=1e-4), name
+
+
+def test_window_scores_do_not_depend_on_how_clips_are_chunked():
+    mx.random.seed(0)
+    observer = V.ModelObserver(M.WindowModel(M.Config(d=32, layers=1, heads=2, arch="window", window=8)))
+    frames = np.random.default_rng(0).normal(0.25, 0.15, (8, 24, 32, 32)).astype(np.float32)
+    observer.chunk = 8
+    whole = observer.score(frames)
+    observer.chunk = 3
+    parts = observer.score(frames)
+    for a, b in zip(whole, parts):
+        assert np.allclose(a[:, 1:], b[:, 1:], atol=1e-3)
 
 @pytest.mark.parametrize("fam,level", [("vanish", 8), ("exit", 8), ("teleport", 1.0)])
 def test_shared_prefix_scores_each_twin_as_a_full_rollout_does(fam, level):

@@ -196,31 +196,35 @@ def ball_cover(pos, rad, alive):
 
 
 def render(traj, rng=None, noise=NOISE):
-    """Frames (B, T, H, W) and per-ball visible fraction (B, T, N)."""
+    """Frames (B, T, H, W) and per-ball visible fraction (B, T, N). A frame at a time: a clip's coverage at once is gigabytes."""
     sc = traj.scene
     occ_cov, occ_lum = occluder_cover(sc)
-    rad = np.broadcast_to(sc.rad[:, None], traj.alive.shape)
-    lum = sc.lum[:, None, :, None, None]
-    cov = ball_cover(traj.pos, rad, traj.alive)  # (B, T, N, H, W)
-    balls = np.max(cov * lum, axis=2)
-    oc = occ_cov[:, None]
-    img = balls * (1 - oc) + occ_lum[:, None] * oc
-    mass = cov.sum((-1, -2))
-    seen = (cov * (1 - oc[:, :, None])).sum((-1, -2))
-    visible = np.where(mass > 0, seen / np.maximum(mass, 1e-6), 0)
+    lum = sc.lum[:, :, None, None]
+    B, T, N = traj.alive.shape
+    img = np.empty((B, T, SIZE, SIZE))
+    visible = np.empty((B, T, N), np.float32)
+    for t in range(T):
+        cov = ball_cover(traj.pos[:, t], sc.rad, traj.alive[:, t])  # (B, N, H, W)
+        img[:, t] = np.max(cov * lum, axis=1) * (1 - occ_cov) + occ_lum * occ_cov
+        mass = cov.sum((-1, -2))
+        seen = (cov * (1 - occ_cov[:, None])).sum((-1, -2))
+        visible[:, t] = np.where(mass > 0, seen / np.maximum(mass, 1e-6), 0)
     if rng is not None and noise > 0:
         img = img + rng.normal(0, noise, img.shape)
-    return img.astype(np.float32), visible.astype(np.float32)
+    return img.astype(np.float32), visible
 
 
 def visible(traj):
     """(B, T) visible fraction of ball 0, without the cost of rendering frames."""
     sc = traj.scene
     occ_cov, _ = occluder_cover(sc)
-    cov = ball_cover(traj.pos[:, :, 0], sc.rad[:, None, 0], traj.alive[:, :, 0])
-    mass = cov.sum((-1, -2))
-    seen = (cov * (1 - occ_cov[:, None])).sum((-1, -2))
-    return np.where(mass > 0, seen / np.maximum(mass, 1e-6), 0)
+    out = np.empty(traj.alive.shape[:2])
+    for t in range(out.shape[1]):
+        cov = ball_cover(traj.pos[:, t, 0], sc.rad[:, 0], traj.alive[:, t, 0])
+        mass = cov.sum((-1, -2))
+        seen = (cov * (1 - occ_cov)).sum((-1, -2))
+        out[:, t] = np.where(mass > 0, seen / np.maximum(mass, 1e-6), 0)
+    return out
 
 
 def train_batch(rng, B, T):

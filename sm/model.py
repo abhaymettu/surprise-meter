@@ -17,6 +17,8 @@ import mlx.nn as nn
 
 from .world import NOISE, SIZE
 
+mx.set_cache_limit(256 << 20)  # by default freed GPU buffers can pile up to the memory limit, 22.8 GB on a 24 GB Mac
+
 PATCH = 8
 GRID = SIZE // PATCH
 TOKENS = GRID * GRID  # tokens per frame
@@ -35,12 +37,13 @@ class Config:
     state_norm: bool = True  # recurrent: LayerNorm the state between frames
     window: int = 32  # window: attention span in frames
     rope_base: float = 500.0
+    recompute: int = 0  # recurrent, training: leading frames rebuilt for the backward pass rather than kept, which only saves memory
 
 
 SIZES = {
     "1m": Config(d=128, layers=5, heads=2),
     "5m": Config(d=256, layers=6, heads=4),
-    "20m": Config(d=384, layers=11, heads=6),
+    "20m": Config(d=384, layers=11, heads=6, recompute=40),  # about 8 GB, against over 10 with none
 }
 
 
@@ -191,8 +194,10 @@ class RecurrentModel(nn.Module):
         p = patchify(frames)
         state = self.initial_state(B)
         out = []
+        rebuilt = nn.utils.checkpoint(self, self.step)
         for t in range(T):
-            state, mean, sigma, logit = self.step(state, p[:, t * TOKENS : (t + 1) * TOKENS], None if blank is None else blank[:, t])
+            step = rebuilt if self.training and t < self.cfg.recompute else self.step
+            state, mean, sigma, logit = step(state, p[:, t * TOKENS : (t + 1) * TOKENS], None if blank is None else blank[:, t])
             out.append((mean, sigma, logit))
         return tuple(mx.stack(a, 1) for a in zip(*out))
 

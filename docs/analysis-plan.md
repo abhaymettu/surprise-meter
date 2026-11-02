@@ -96,4 +96,4 @@ Criterion for "bigger decides better here": the head's 3 px crossing on 5M has a
 
 ## Changes after the freeze
 
-None yet.
+Memory, before `runs/5m-s1` started. Measuring reached 25 GB on a 24 GB machine, because macOS malloc kept freed numpy buffers and MLX kept freed GPU buffers. Both caches are now limited, rendering works a frame at a time, and the window control scores 16 clips at a time. No number moved: a full evaluate of `1m-s0` is bit-identical to the one before the change, on all 678 arrays and its report, and `causal` was identical on all 569 before the rendering change, which is bit-identical to the old code on every family and level. 20M training rebuilds its first 40 frames for the backward pass, which keeps it near 8 GB. Its logged loss after 50 steps was the same to every printed digit with 24, 40 and 64 frames rebuilt.
