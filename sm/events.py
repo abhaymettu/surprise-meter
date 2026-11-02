@@ -41,6 +41,7 @@ class Pairs:
     window: np.ndarray  # (B, 2) [start, end) frames scored by the 2AFC
     window_full: np.ndarray = None  # occluded events: the same start, through full emergence
     sign: np.ndarray = None  # (B,) direction of a signed edit
+    fork: np.ndarray = None  # (B,) the first frame where the twins differ; a scored window can start later
 
 
 def _unit(v):
@@ -77,7 +78,7 @@ def _finish(family, mag, dur, sc, law, imp, rng_noise_seed, length, length_full=
         none = W.simulate(replace(sc, alive=np.zeros_like(sc.alive)), law_clean.shape[1])
         control = W.render(none)[0][:CONTROL_CLIPS] + noise[:CONTROL_CLIPS]
     full = win if length_full is None else np.stack([td, np.minimum(td + length_full, law_clean.shape[1])], -1)
-    return Pairs(family, mag, dur, law_clean + noise, imp_clean + noise, control, law, imp, law_vis, imp_vis, win, full, sign)
+    return Pairs(family, mag, dur, law_clean + noise, imp_clean + noise, control, law, imp, law_vis, imp_vis, win, full, sign, td)
 
 
 def _collect(rng, B, propose):

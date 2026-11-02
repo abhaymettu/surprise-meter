@@ -27,7 +27,7 @@ def job(size, seed, window=None, steps=None, tag=None):
 EXPLORATORY = [job("1m", s) for s in range(4)] + [job("5m", 0)]
 CONTROLS = [job("1m", 0, window=8), job("5m", 0, steps=10000, tag="short"), job("1m", 0, steps=60000, tag="long")]
 CONFIRMATORY = [job("5m", 1), job("5m", 2), job("20m", 0), job("5m", 3), job("5m", 4), job("20m", 1), job("20m", 2)]
-PLAN = EXPLORATORY + CONTROLS + CONFIRMATORY
+PLAN = EXPLORATORY + CONTROLS[:1] + CONFIRMATORY[:2] + CONTROLS[1:2] + CONFIRMATORY[2:3] + CONTROLS[2:] + CONFIRMATORY[3:]  # the seeds the headline rests on come first
 
 
 def run(*cmd, tries=200):

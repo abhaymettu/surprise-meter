@@ -61,10 +61,12 @@ def targets(traj):
 
 
 def fit(model, seed=7):
-    """One map per target, each as weight (PDIM, d) and bias (PDIM,). All are linear on one state token, as the head is."""
+    """One map per target, each as weight (PDIM, d) and bias (PDIM,). All are linear on one state token, as the head is. One
+    more, "visible", is fitted to the next frame only on pixels no slab covers, so it is never told where a hidden ball is."""
     rng = np.random.default_rng(seed)
     d = model.cfg.d
     xtx, xty = np.zeros((d + 1, d + 1)), np.zeros((d + 1, len(TARGETS) * M.PDIM))
+    vis_xtx, vis_xty = np.zeros((M.PDIM, d + 1, d + 1)), np.zeros((M.PDIM, d + 1))
     for clips, T in FIT:
         for i in range(0, clips, 32):
             traj = W.simulate(W.random_scene(rng, 32), T + 1)
@@ -76,8 +78,17 @@ def fit(model, seed=7):
             y = target.reshape(-1, target.shape[-1]).astype(np.float64)
             xtx += x.T @ x
             xty += x.T @ y
+            clear = np.array(M.patchify(mx.array(np.repeat((W.occluder_cover(traj.scene)[0] < 0.01)[:, None], T - 4, 1).astype(np.float32)))).reshape(-1, M.PDIM)
+            nxt = y[:, TARGETS.index("next") * M.PDIM :][:, : M.PDIM]
+            for px in range(M.PDIM):
+                kept = x[clear[:, px] > 0.5]
+                vis_xtx[px] += kept.T @ kept
+                vis_xty[px] += kept.T @ nxt[clear[:, px] > 0.5, px]
     sol = np.linalg.solve(xtx + RIDGE * np.eye(d + 1), xty).astype(np.float32)
-    return {name: (sol[:-1, i * M.PDIM : (i + 1) * M.PDIM].T, sol[-1, i * M.PDIM : (i + 1) * M.PDIM]) for i, name in enumerate(TARGETS)}
+    maps = {name: (sol[:-1, i * M.PDIM : (i + 1) * M.PDIM].T, sol[-1, i * M.PDIM : (i + 1) * M.PDIM]) for i, name in enumerate(TARGETS)}
+    vis = np.stack([np.linalg.solve(vis_xtx[px] + RIDGE * np.eye(d + 1), vis_xty[px]) for px in range(M.PDIM)]).astype(np.float32)
+    maps["visible"] = vis[:, :-1], vis[:, -1]
+    return maps
 
 
 def decode(states, weight, bias):
@@ -136,10 +147,10 @@ def read_position(states, position):
     return (states.reshape(B, Tf, tok * d) - mean_x) @ w + mean_y
 
 
-def through_slabs(states, maps):
-    """The decoded balls seen through the decoded slabs, so the read's picture of the next frame comes from the state alone."""
+def through_slabs(states, maps, balls="balls"):
+    """Decoded balls seen through the decoded slabs, so the picture of the next frame comes from the state alone."""
     cov = np.clip(decode(states, *maps["cover"]), 0, 1)
-    return np.clip(decode(states, *maps["balls"]), 0, 1) * (1 - cov) + np.clip(decode(states, *maps["layer"]), 0, 1)
+    return np.clip(decode(states, *maps[balls]), 0, 1) * (1 - cov) + np.clip(decode(states, *maps["layer"]), 0, 1)
 
 
 def roll(model, clip, remove=None, hide=None):
@@ -253,6 +264,7 @@ def measure(model, maps, position):
                 "head": (law_head, imp_head),
                 "mean": (law_mean, imp_mean),
                 "refit": (image_costs(p.lawful, decode(law, *maps["next"])), image_costs(p.impossible, decode(imp, *maps["next"]))),
+                "visible": (image_costs(p.lawful, through_slabs(law, maps, "visible")), image_costs(p.impossible, through_slabs(imp, maps, "visible"))),
                 "read": (image_costs(p.lawful, through_slabs(law, maps)), image_costs(p.impossible, through_slabs(imp, maps))),
             }
             found = {key + name: within(b, win) - within(a, win) for key, (a, b) in readers.items() for name, win in (("", p.window), ("_full", p.window_full))}

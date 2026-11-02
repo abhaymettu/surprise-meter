@@ -1,11 +1,13 @@
 """The instrument, checked without any trained model: twins, the ideal observer, the null and the thresholds."""
 
+import mlx.core as mx
 import numpy as np
 import pytest
 
 from sm import analyze as A
 from sm import events as E
 from sm import evaluate as V
+from sm import model as M
 from sm import surprise as S
 from sm import world as W
 
@@ -108,9 +110,22 @@ def test_reader_gap_finds_the_longer_lasting_reader():
     seeds = []
     for _ in range(2):
         head, read, mean, refit = margin(10), margin(18), margin(10), margin(10)
-        seeds.append({f"vanish/{D}/{k}{w}": curve[D] for D in levels for k, curve in (("head", head), ("mean", mean), ("refit", refit), ("read", read)) for w in ("", "_full")})
+        seeds.append({f"vanish/{D}/{k}{w}": curve[D] for D in levels for k, curve in (("head", head), ("mean", mean), ("refit", refit), ("visible", refit), ("read", read)) for w in ("", "_full")})
     out = A.reader_gaps(seeds, "vanish", levels, np.random.default_rng(1))
     assert 8 <= out["head_crossing"] <= 12
     assert 16 <= out["read_crossing"] <= 20
     assert out["read_minus_head_ci"][0] > 0
     assert abs(out["mean_minus_head"]) < 3
+
+
+@pytest.mark.parametrize("fam,level", [("vanish", 8), ("exit", 8), ("teleport", 1.0)])
+def test_shared_prefix_scores_each_twin_as_a_full_rollout_does(fam, level):
+    mx.random.seed(0)
+    model = M.RecurrentModel(M.Config(d=32, layers=1, heads=2))
+    observer = V.ModelObserver(model)
+    p = E.FAMILIES[fam]["fn"](np.random.default_rng(0), 4, level)
+    _, _, imp, _ = observer.twins(p)
+    whole = observer.score(p.impossible)[0]
+    for b in range(4):
+        start = p.fork[b]
+        assert np.allclose(imp[b, start:], whole[b, start:], atol=1e-2)

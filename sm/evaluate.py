@@ -79,10 +79,10 @@ class ModelObserver:
             return self.score(p.lawful) + self.score(p.impossible)
         B, T = p.lawful.shape[:2]
         out = np.full((4, B, T), np.nan, np.float32)
-        order = np.argsort(p.window[:, 0])
+        order = np.argsort(p.fork)
         for i in range(0, B, 64):
             rows = order[i : i + 64]
-            fork = max(int(p.window[rows, 0].min()), 1)
+            fork = max(int(p.fork[rows].min()), 1)
             state = self.model.initial_state(len(rows))
             head = p.lawful[rows]
             if fork > 1:

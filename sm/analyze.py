@@ -26,7 +26,7 @@ ALPHA = 1e-3
 BOOT = 500
 TRAIN_REVEAL_MAX = 41  # the longest hidden run seen in a training clip; longer durations are extrapolation
 EXPLORATORY = {"5m-s0"}  # watched while this analysis was built, so it leaves its group once a confirmatory seed exists
-READERS = ("head", "mean", "refit", "read")
+READERS = ("head", "mean", "refit", "visible", "read")
 ABLATED = [f"head_without_{name}_{k}" for k in (4, 16) for name in ("read", "random")]
 
 
@@ -236,9 +236,9 @@ def reader_gaps(margins, fam, levels, rng):
         crossing = {k: [point(k + w, s, i) for s, i in draws] for k in READERS}
         for k in READERS:
             out[f"{k}{w}_crossing"], out[f"{k}{w}_crossing_ci"] = point(k + w, every, scenes), np.percentile(crossing[k], [2.5, 97.5])
-        for k in READERS[1:]:
-            out[f"{k}_minus_head{w}"] = out[f"{k}{w}_crossing"] - out[f"head{w}_crossing"]
-            out[f"{k}_minus_head{w}_ci"] = np.percentile(np.subtract(crossing[k], crossing["head"]), [2.5, 97.5])
+        for k, base in [(k, "head") for k in READERS[1:]] + [("visible", "refit"), ("read", "visible")]:
+            out[f"{k}_minus_{base}{w}"] = out[f"{k}{w}_crossing"] - out[f"{base}{w}_crossing"]
+            out[f"{k}_minus_{base}{w}_ci"] = np.percentile(np.subtract(crossing[k], crossing[base]), [2.5, 97.5])
     return out
 
 

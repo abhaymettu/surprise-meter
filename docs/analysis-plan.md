@@ -6,7 +6,7 @@ Written before any confirmatory seed was trained. The commit that last touched t
 
 Noise 0.15, 64-frame clips and crossing scenes were picked while watching vanish curves on single 1M runs, with seven pilot evaluations on disk. Fresh scenes (seed 20261102) remove scene selection. They do not remove design selection, and the seeds below cannot either, because they share the design.
 
-A reviewer's scripts produced rough versions of most measures below on `5m-s0`, and the analysis was debugged on the same run. So the predictions below are informed by that seed.
+A reviewer's scripts produced rough versions of most measures below on `5m-s0`. This analysis was then debugged on `5m-s0` and `1m-s0`, and the readers and ablation sizes below were chosen after seeing them there. So the predictions are informed by those runs. The confirmatory seeds are the test.
 
 ## Runs
 
@@ -28,28 +28,44 @@ If time runs out, runs are dropped in this order: `20m-s2`, `20m-s1`, `5m-s4`, `
 - Threshold: binomial maximum likelihood logistic in log magnitude at 75% correct, with a fitted floor, because a directional bias under matched noise holds proportion correct at a constant other than 0.5 as magnitude falls.
 - Intervals: 95%, hierarchical bootstrap, 500 resamples of seeds then scenes.
 - Trace: median surprisal per frame at identical empty frames, ball seen earlier minus ball never there.
-- Linear read: ridge from the frozen state, fitted on fresh lawful clips, one fit for measurement and the demo.
+
+## Readers
+
+Five ways to turn one frozen state into a picture of the next frame. Each is linear on one state token, as the model's head is, and each is scored on the same twins. The maps are ridge regressions fitted on fresh lawful clips, not the test scenes.
+
+| Reader | How it makes the picture | Told where a hidden ball is? |
+|---|---|---|
+| head | The model's own head and likelihood | No |
+| mean | The head's mean, at the world's fixed noise | No |
+| refit | Ridge to the next frame | No |
+| visible | Ridge to the next frame on pixels no slab covers, drawn through slabs decoded from the state | No |
+| read | Ridge to the next frame with slabs removed, drawn through slabs decoded from the state | Yes, when fitted |
+
+The longer reveal window lowers the head instead of raising it, because a twin decision needs the predicted ball above about half its true contrast and frames with a ball cost more than empty ones. So the 9 px window is reported beside the 3 px window and never replaces it.
 
 ## Questions and what each answer allows
 
 These are the only claims that can reach the headline. Each is reported whatever it shows. Nothing here is a significance test, so there is no multiple-comparison correction. The criterion is what decides the sentence.
 
-**Q1. Does one state hold more than its head uses?** The linear read goes through the same pixel likelihood as the head, on the same twins.
+**Q1. Does one state hold more than its head reads out?**
 
-Criterion: on vanish and on rebound, in the 3 px and 9 px windows, read crossing minus head crossing has a 95% interval above 0 on confirmatory 5M, and the read crossing is at least 1.5 times the head crossing. Reported per seed as well.
+Criterion: on vanish and on rebound, at 3 px and at 9 px, read crossing minus head crossing has a 95% interval above 0 on confirmatory 5M, and at 3 px the read crossing is at least 1.5 times the head crossing. Reported per seed as well.
 
-- All met: "A linear map keeps the lawful twin ahead about N times as long as the model's head, on the same state and the same likelihood."
-- Only under the 3 px window: the gap is the instrument, so the claim is dropped and the 3 px curve is described as such.
+- Met: "A linear map keeps the lawful twin ahead about N times as long as the model's head, on the same state and the same likelihood." The next sentence always says the map was told where hidden balls are when it was fitted.
+- Not met at 9 px while met at 3 px: the gap is the instrument, so the claim is dropped.
 
-**Q2. Why does the head fall behind?** The head's mean is scored under the world's fixed noise, with the learned variance removed.
+**Q2. Where does the gap come from?** Each step down the reader table changes one thing. A step counts if its difference in crossing has a 95% interval excluding 0 and a point estimate of at least 2 frames, at 3 px on confirmatory 5M.
 
-- Mean crossing near the read's, meaning its interval on (mean minus head) excludes 0 and it is within 25% of the read: the head kept the ball and its own uncertainty hides it.
-- Mean crossing near the head's: the head's output has lost what the read still finds.
-- Between: both, and the numbers are given without a causal sentence.
+- mean against head: the learned variance.
+- refit against head: how the map was trained, with target and function class unchanged.
+- visible against refit: not being charged for covered pixels, and drawing through slabs, with no hidden target.
+- read against visible: being told where the hidden ball is.
 
-**Q3. Does the head use those directions?** While hidden, the read's directions are projected out of the state and the head is measured again. Control: a random subspace of the same size.
+Steps that do not count are written as not the cause. If read against visible counts, the sentence is: "The state holds this, and next-frame pixels alone did not pull it out with a linear map." No sentence says the model could use it without more training.
 
-Criterion: at D = 8, the drop in head proportion correct from removing the read's directions exceeds the drop from removing random ones by at least 0.10, in every confirmatory 5M seed. Met: "the head depends on those directions." Not met: "removing them changes the head no more than a random subspace", which is itself the finding. Removing random directions also damages the state, so a large drop in the control means both are reported and no causal sentence is written.
+**Q3. Does the head use those directions?** While the ball is hidden, the read's four strongest directions are projected out of the state and the head is measured again. Control: four random directions. Sixteen of each are reported too. Removing 64 is too blunt, since random removal alone took the head to zero on `5m-s0`. The share of state variance each set carries is reported.
+
+Criterion: at D = 8, on vanish and on rebound, the drop in the head's proportion correct from removing the read's four exceeds the drop from removing random four by at least 0.10, in every confirmatory 5M seed. Met: "The head depends on those directions, which carry under N% of the state's variance." Not met: "Removing them changes the head no more than random ones of the same number."
 
 **Q4. Does the read follow an unseen bounce?** Signed motion along x, read against truth, on the outward and return strokes.
 
@@ -60,9 +76,11 @@ Criterion: at D = 16 and D = 28, in every confirmatory 5M seed, return-stroke di
 - `1m-window8-s0`: past D = 12 its trace falls under 10% of its value at D = 1. If not, the trace is contaminated and is not quoted as memory.
 - Exit: the ball visibly leaves through the wall, then the same empty frames against never there. The vanish trace is reported beside it, and only the part above the exit trace is called holding on to a hidden ball.
 
-**Q6. What does size do at equal training?** Crossing in the 9 px window, trace amplitude at D = 1 and trace half-life, 1M against 5M against 20M at 20000 steps.
+Every training scene holds at least one ball, so a clip with no ball is itself off the training generator, and a ball leaving the frame has no precedent in training either. Both are said where the trace is quoted.
 
-Criterion for "bigger decides better here": 5M's interval above 1M's on vanish and on rebound, and `5m-short-s0` still above 1M. If `1m-long-s0` reaches 5M's interval, the sentence is about training length and not size. The same for 20M against 5M. A size difference is never written as a memory-length difference unless trace half-life also separates.
+**Q6. What does size do at equal training?** The head's crossing at 3 px, the read's crossing at both windows, trace amplitude at D = 1 and trace half-life, 1M against 5M against 20M at 20000 steps.
+
+Criterion for "bigger decides better here": the head's 3 px crossing on 5M has an interval above 1M's on vanish and on rebound, and `5m-short-s0` is still above 1M. If `1m-long-s0` reaches 5M's interval, the sentence is about training length and not size. The same for 20M against 5M. A size difference is never written as a memory-length difference unless trace half-life also separates.
 
 **Q7. Is there a speed-independent fall?** Crossing within the bands 0.15 to 0.4, 0.4 to 0.6, 0.6 to 1.3 px per frame. Long hidden times come with slow balls, so any pooled vanish crossing is quoted only with its bands next to it.
 

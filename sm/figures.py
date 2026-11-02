@@ -232,6 +232,30 @@ def speed_split(s, path):
     plt.close(fig)
 
 
+def readers(s, path):
+    """One state, one likelihood, one set of twins. What changes down the list is only how the map from state to picture was
+    fitted, and what it was told."""
+    if "5m" not in s["sizes"] or not s["sizes"]["5m"]["xray"]:
+        return
+    fig, axes = plt.subplots(1, 2, figsize=(11, 3.6), sharey=True, gridspec_kw={"wspace": 0.72})
+    marks = [("head", "the model's head", "#9db7d5", "o", "-"), ("refit", "ridge to the next frame", "#4a7fb5", "s", "--"), ("visible", "ridge to visible pixels", "#b5651d", "^", "-"), ("read", "told where the hidden ball is", "#12355b", "D", "-")]
+    for ax, fam in zip(axes, ("vanish", "rebound")):
+        d = s["sizes"]["5m"]["xray"]["decisions"][fam]
+        ends = []
+        for key, label, color, marker, ls in marks:
+            ax.plot(d["D"], d[key], color=color, marker=marker, ms=4, lw=1.7, ls=ls)
+            ends.append((label, np.interp(32, d["D"], d[key]), color))
+        ax.axhline(0.5, color="#bbbbbb", lw=0.8, zorder=0)
+        ax.set_xlim(0, 32.5)
+        ax.set_ylim(-0.03, 1.03)
+        ax.set_xlabel("frames hidden")
+        ax.set_title(TITLES[fam])
+        end_labels(ax, ends)
+    axes[0].set_ylabel("pairs favouring the lawful twin")
+    fig.savefig(path)
+    plt.close(fig)
+
+
 def stimuli(path):
     """One matched pair from each family, frame by frame around the event: the two clips differ only after the fork."""
     rows = [("teleport", 2.0), ("deflect", 64), ("phantom", 4.0), ("passthrough", 1.0), ("collision", 2.0), ("vanish", 12), ("hidden", 3.0), ("rebound", 16)]
@@ -319,14 +343,14 @@ def tables(s):
     gx = [g for g in present if s["sizes"][g]["xray"]]
     rows = []
     for fam in ("vanish", "rebound"):
-        for name, key in (("head", "head"), ("head's mean at the world's noise", "mean"), ("ridge to the next frame", "refit"), ("linear read through decoded slabs", "read")):
+        for name, key in (("head", "head"), ("head's mean at the world's noise", "mean"), ("ridge to the next frame", "refit"), ("ridge to visible pixels, through decoded slabs", "visible"), ("linear read through decoded slabs", "read")):
             for window, w in (("3 px", ""), ("full", "_full")):
                 d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
                 rows.append([fam, f"{name}, {window}"] + [crossing(x[key + w + "_crossing"], 4, x[key + w + "_crossing_ci"]) for x in d])
-        for name, key in (("head's mean minus head", "mean"), ("ridge to the next frame minus head", "refit"), ("linear read minus head", "read")):
+        for name, key, base in (("head's mean minus head", "mean", "head"), ("ridge to the next frame minus head", "refit", "head"), ("ridge to visible pixels minus ridge to the next frame", "visible", "refit"), ("linear read minus ridge to visible pixels", "read", "visible"), ("linear read minus head", "read", "head")):
             for window, w in (("3 px", ""), ("full", "_full")):
                 d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
-                rows.append([fam, f"{name}, {window}"] + [f"{x[f'{key}_minus_head{w}']:+.1f} [{x[f'{key}_minus_head{w}_ci'][0]:+.1f}, {x[f'{key}_minus_head{w}_ci'][1]:+.1f}]" for x in d])
+                rows.append([fam, f"{name}, {window}"] + [f"{x[f'{key}_minus_{base}{w}']:+.1f} [{x[f'{key}_minus_{base}{w}_ci'][0]:+.1f}, {x[f'{key}_minus_{base}{w}_ci'][1]:+.1f}]" for x in d])
     table("family | scored by | " + names(gx), rows)
     lines += ["## Taking directions out of the state while hidden: the head's 2AFC", ""]
     rows = []
@@ -377,6 +401,7 @@ def main():
     psychometric(s, OUT / "psychometric.png")
     calibration(s, OUT / "calibration.png")
     speed_split(s, OUT / "speed.png")
+    readers(s, OUT / "readers.png")
     stimuli(OUT / "stimuli.png")
     tables(s)
     print(f"wrote {OUT} and results/tables.md")

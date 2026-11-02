@@ -53,7 +53,7 @@ function fmtOneIn(n) {
 
 function meaning(n) {
   if (n >= TOP) return `Stranger than all ${twoFigures(TOP)} lawful frames this was calibrated on.`;
-  if (n >= 1e4) return "Almost never happens when the physics is real. The model is confident something is wrong.";
+  if (n >= 1e4) return "Almost never happens when the physics is real.";
   if (n >= 300) return "Unusual. Lawful physics gets here only now and then.";
   return "Nothing unusual. One in this many lawful frames looks at least this strange.";
 }
