@@ -9,8 +9,8 @@ JavaScript and WebGPU for the browser demo.
 - `sm/events.py` the matched lawful and impossible twins for every family and magnitude.
 - `sm/model.py` the recurrent model and the windowed control. `sm/train.py` trains and resumes.
 - `sm/surprise.py` defines surprisal, excess, evidence and surprise. Read its docstring before changing anything downstream.
-- `sm/observers.py` dead reckoning with and without memory. The ideal observer is in `sm/evaluate.py`.
-- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear decoder and its curves. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
+- `sm/observers.py` dead reckoning with walls, wall-blind, no memory, and frozen at last seen. The observer told the state and the causal ideal are in `sm/evaluate.py`.
+- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear maps on a frozen state and scores five readers on the twins `sm.evaluate` scored. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
 - `sm/ladder.py` is the experiment plan. `sm/export.py` packages a run for `demo/`.
 
 ## Commands
@@ -23,8 +23,9 @@ JavaScript and WebGPU for the browser demo.
 
 ## Rules for changes
 
+- `docs/analysis-plan.md` was frozen before the confirmatory seeds and decides what each result allows the text to say. A change that moves a reported number gets a line in its last section, and every run is measured again.
 - Every number in the README and the paper comes from `results/tables.md` or `results/summary.json`. Change the pipeline, rerun it, then change the prose.
-- Changing `SEED` in `sm/evaluate.py`, a family's levels or `NOISE` invalidates every `eval.npz`. Remeasure all of them and the three reference observers together.
+- Changing `SEED` in `sm/evaluate.py`, a family's levels or `NOISE` invalidates every `eval.npz`. Remeasure all of them and the six reference observers together.
 - Weight layout is frozen by the head shape in `sm/model.py`. Trained weights will not load after a change there.
 - The browser engines must match MLX. After any model change run the parity checks before trusting the demo.
 - Colors in figures and the demo differ in lightness as well as hue, with the meaning also in text or shape.
