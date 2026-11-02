@@ -458,11 +458,19 @@ function toWorld(e) {
   return { x: ((e.clientX - r.left) / r.width) * SIZE, y: ((e.clientY - r.top) / r.height) * SIZE };
 }
 
+function ballAt(p) {
+  const b = world.balls.filter((b) => b.alive).sort((a, c) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(c.x - p.x, c.y - p.y))[0];
+  return b && Math.hypot(b.x - p.x, b.y - p.y) <= b.r + 1.6 ? b : null;
+}
+
+// a finger on a ball drags it; a finger anywhere else still scrolls the page
+stage.addEventListener("touchstart", (e) => { if (ballAt(toWorld(e.touches[0]))) e.preventDefault(); }, { passive: false });
+
 stage.addEventListener("pointerdown", (e) => {
   if (grab) return;
   const p = toWorld(e);
-  const b = world.balls.filter((b) => b.alive).sort((a, c) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(c.x - p.x, c.y - p.y))[0];
-  if (!b || Math.hypot(b.x - p.x, b.y - p.y) > b.r + 1.6) return;
+  const b = ballAt(p);
+  if (!b) return;
   stage.setPointerCapture(e.pointerId);
   stage.classList.add("grabbing");
   b.held = true;
@@ -525,7 +533,7 @@ both("aVanish", () => {
 both("aReverse", () => { for (const b of world.balls) { b.vx *= -1; b.vy *= -1; } mark("reversed"); caption("Everything turned around with nothing to hit."); });
 both("aWalls", () => { world.wallsOn = !world.wallsOn; mark(world.wallsOn ? "walls back" : "walls off"); caption(world.wallsOn ? "" : "Now watch a ball reach the edge. It keeps going, and the model expected a bounce."); });
 both("aFreeze", () => { frozen = !frozen; mark(frozen ? "froze" : "released"); caption(frozen ? "Stopped dead, mid-flight. It expected the next frame to be different." : ""); });
-both("aGhost", () => { world.collide = world.collide === false ? true : false; mark(world.collide === false ? "no collisions" : "collisions back"); if (world.collide === false) caption("Solid things now pass through each other."); });
+both("aGhost", () => { world.collide = world.collide === false ? true : false; mark(world.collide === false ? "no collisions" : "collisions back"); caption(world.collide === false ? "Solid things now pass through each other." : ""); });
 both("aNew", () => { frozen = false; newWorld({ occluders: 1 + (Math.random() < 0.25) }); caption(""); });
 
 // ---- first visit: show the idea without asking for anything ----------------------------------------------------------
@@ -540,7 +548,12 @@ function caption(text, ms = 5200) {
 }
 
 let attract = true;
-function stopAttract() { attract = false; }
+function stopAttract() {
+  if (!attract) return;
+  attract = false;
+  wantVanish = false; // the tour may have armed it; from here on it is only armed by the reader
+  uiState();
+}
 
 function crossingSoon() {
   return world.balls.some((b) => b.alive && (hiddenFully(b) || world.occ.some((o) => {
