@@ -2,6 +2,14 @@
 __pycache__/
 *.pyc
 scratch/
+.remember/
+.DS_Store
 runs/*/ckpt/
 runs/*.log
-.DS_Store
+runs/*/final.safetensors
+runs/*/xray.safetensors
+runs/e[0-9]*/
+runs/pilot-*/
+runs/*-half/
+runs/observers/*.log
+demo/*.parity.json

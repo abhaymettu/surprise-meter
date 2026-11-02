@@ -7,22 +7,23 @@ seeds, then resample scenes, so they carry both model uncertainty and stimulus u
 """
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 from scipy.optimize import minimize
-from scipy.stats import norm
 
 from . import events as E
 
 RUNS = Path("runs")
 SIZES = ["1m", "5m", "20m"]
+CONTROLS = ["1m-window8"]  # attention over 8 past frames: a model whose memory has a known length
 OBSERVERS = ["ideal", "cv", "cv0"]
 KINEMATIC = ["teleport", "deflect", "phantom", "collision", "hidden"]
 DURATION = ["vanish", "rebound"]
 ALPHA = 1e-3
 BOOT = 500
-TRAIN_REVEAL_MAX = 28  # a 32-frame training clip cannot show a reveal after more hidden frames than this
+TRAIN_REVEAL_MAX = 41  # the longest hidden run seen in a training clip; longer durations are extrapolation
 
 
 def load(path):
@@ -30,13 +31,14 @@ def load(path):
     return {k: d[k] for k in d.files}
 
 
-def seed_dirs(size):
-    return sorted(RUNS.glob(f"{size}-s*"), key=lambda p: int(p.name.split("-s")[1]))
+def seed_dirs(group):
+    """Run directories of one size or control, in seed order. Experiments with other names are not picked up."""
+    found = [p for p in RUNS.iterdir() if re.fullmatch(rf"{re.escape(group)}-s(\d+)", p.name)]
+    return sorted(found, key=lambda p: int(p.name.rsplit("-s", 1)[1]))
 
 
 def cut(ev, alpha=ALPHA):
-    s = ev["null_sorted"]
-    return s[min(int(np.ceil(len(s) * (1 - alpha))), len(s) - 1)]
+    return float(np.interp(np.log(alpha * ev["null_n"]), np.log(ev["null_ranks"]), ev["null_tail"]))
 
 
 def curves(ev, fam, levels, c, idx=None):
@@ -53,14 +55,23 @@ def curves(ev, fam, levels, c, idx=None):
     return np.array(pc), np.array(hit), np.array(fa), np.array(lbf)
 
 
-def fit_threshold(x, y, n, floor, target):
-    """Binomial ML logistic in log magnitude with a fixed floor and a small lapse. Magnitude reaching `target`, or None
-    when the data never bracket it (reported as above or below the tested range)."""
+def trace(ev, fam, levels, idx=None):
+    """Median surprisal at identical empty frames, ball seen earlier minus ball never there. Zero means no memory."""
+    out = []
+    for lv in levels:
+        d = ev[f"{fam}/{lv}/imp_nll"] - ev[f"{fam}/{lv}/ctrl_nll"]
+        out.append(np.median(d if idx is None else d[idx]))
+    return np.array(out)
+
+
+def fit_threshold(x, y, n, floor, target, start=None):
+    """Binomial ML logistic in log magnitude with a fixed floor and a small lapse. Magnitude reaching `target`, or an
+    infinity or zero when the data never bracket it. `start` skips the search over starting points."""
     x, y = np.log(np.asarray(x, float)), np.asarray(y, float)
     if y.max() < target:
-        return float("inf")
+        return float("inf"), None
     if y.min() >= target:
-        return 0.0
+        return 0.0, None
     lapse = 0.01
 
     def nll(th):
@@ -69,47 +80,133 @@ def fit_threshold(x, y, n, floor, target):
         p = np.clip(p, 1e-6, 1 - 1e-6)
         return -(n * (y * np.log(p) + (1 - y) * np.log(1 - p))).sum()
 
+    starts = [start] if start is not None else [[m, s] for m in np.quantile(x, [0.2, 0.5, 0.8]) for s in (-1.0, 0.0)]
     best = None
-    for mu0 in np.quantile(x, [0.2, 0.5, 0.8]):
-        for ls0 in (-1.0, 0.0):
-            r = minimize(nll, [mu0, ls0], method="Nelder-Mead", options={"maxiter": 400, "xatol": 1e-3, "fatol": 1e-3})
-            if best is None or r.fun < best.fun:
-                best = r
+    for th in starts:
+        r = minimize(nll, th, method="Nelder-Mead", options={"maxiter": 400, "xatol": 1e-3, "fatol": 1e-3})
+        if best is None or r.fun < best.fun:
+            best = r
     mu, ls = best.x
-    q = (target - floor) / (1 - floor - lapse)
-    q = np.clip(q, 1e-4, 1 - 1e-4)
-    return float(np.exp(mu + np.exp(ls) * np.log(q / (1 - q))))
+    q = np.clip((target - floor) / (1 - floor - lapse), 1e-4, 1 - 1e-4)
+    return float(np.exp(mu + np.exp(ls) * np.log(q / (1 - q)))), best.x
 
 
-def thresholds(ev, fam, levels, c, idx=None):
+def thresholds(ev, fam, levels, c, idx=None, starts=(None, None)):
     n = len(ev[f"{fam}/{levels[0]}/imp_nll"]) if idx is None else len(idx)
     pc, hit, fa, _ = curves(ev, fam, levels, c, idx)
-    t_afc = fit_threshold(levels, pc, n, 0.5, 0.75)
+    t_afc, s_afc = fit_threshold(levels, pc, n, 0.5, 0.75, starts[0])
     floor = float(np.clip(fa.mean(), 0.0, 0.5))
-    t_det = fit_threshold(levels, hit, n, floor, floor + 0.5 * (1 - floor))
-    return t_afc, t_det
+    t_det, s_det = fit_threshold(levels, hit, n, floor, floor + 0.5 * (1 - floor), starts[1])
+    return t_afc, t_det, (s_afc, s_det)
 
 
-def carry_over(pc, levels):
-    """The longest hidden duration from which the observer still favours the lawful world at every shorter duration."""
-    last = 0
-    for lv, p in zip(levels, pc):
-        if p >= 0.5:
-            last = lv
-        else:
-            break
-    return last
+def falls_through(y, levels, value):
+    """Where a falling curve first drops through `value`, interpolated. 0 if it starts below, the last level if it never does."""
+    if y[0] < value:
+        return 0.0
+    for i in range(1, len(y)):
+        if y[i] < value:
+            return float(levels[i - 1] + (levels[i] - levels[i - 1]) * (y[i - 1] - value) / (y[i - 1] - y[i]))
+    return float(levels[-1])
 
 
-def dprime(pc):
-    return np.sqrt(2) * norm.ppf(np.clip(pc, 1e-3, 1 - 1e-3))
+def geometric(a):
+    """Geometric mean of thresholds; a seed that never reaches threshold makes it infinite."""
+    a = np.asarray(a, float)
+    return float("inf") if not np.isfinite(a).all() else float(np.exp(np.mean(np.log(np.maximum(a, 1e-9)))))
+
+
+def by_speed(evs, fam, levels):
+    """2AFC split at each level's median ball speed. Long hidden times mean slow balls, so D and speed are confounded."""
+    slow, fast = [], []
+    for lv in levels:
+        k = f"{fam}/{lv}"
+        s, f = [], []
+        for ev in evs:
+            d, v = ev[f"{k}/imp_nll"] - ev[f"{k}/law_nll"], ev[f"{k}/speed"]
+            m = np.median(v)
+            s.append(np.mean(d[v <= m] > 0))
+            f.append(np.mean(d[v > m] > 0) if (v > m).any() else np.nan)
+        slow.append(np.mean(s))
+        fast.append(np.nanmean(f))
+    speed = [float(np.median(evs[0][f"{fam}/{lv}/speed"])) for lv in levels]
+    return {"pc_slow": slow, "pc_fast": fast, "median_speed": speed}
+
+
+def measure(fam, levels, evs, rng, ideal=None):
+    """Curves, thresholds and intervals for one group of seeds on one family."""
+    per = np.array([curves(ev, fam, levels, cut(ev)) for ev in evs])  # (seeds, 4, levels)
+    r = {"seeds": len(evs), "pc": per[:, 0].mean(0), "hit": per[:, 1].mean(0), "fa": per[:, 2].mean(0), "lbf": per[:, 3].mean(0), "pc_seeds": per[:, 0]}
+    n = len(evs[0][f"{fam}/{levels[0]}/imp_nll"])
+    kin, dur = fam in KINEMATIC, fam in DURATION
+    if kin:
+        point = [thresholds(ev, fam, levels, cut(ev)) for ev in evs]
+        r["t_afc_seeds"], r["t_det_seeds"] = [p[0] for p in point], [p[1] for p in point]
+        r["t_afc"], r["t_det"] = geometric(r["t_afc_seeds"]), geometric(r["t_det_seeds"])
+    if dur:
+        tr = np.array([trace(ev, fam, levels) for ev in evs])
+        r["trace_nats"], r["trace_seeds"] = tr.mean(0), tr
+        r["crossing_seeds"] = [falls_through(p, levels, 0.5) for p in per[:, 0]]
+        r["crossing"] = falls_through(r["pc"], levels, 0.5)
+        r["trace_half_seeds"] = [falls_through(t, levels, t[0] / 2) for t in tr]
+        r["trace_half"] = falls_through(r["trace_nats"], levels, r["trace_nats"][0] / 2)
+        r["speed"] = by_speed(evs, fam, levels)
+
+    boot = {k: [] for k in ("pc", "hit", "t_afc", "t_det", "trace", "crossing", "trace_half")}
+    for _ in range(BOOT):
+        seeds, idx = rng.integers(0, len(evs), len(evs)), rng.integers(0, n, n)
+        a = np.array([curves(evs[i], fam, levels, cut(evs[i]), idx) for i in seeds])
+        pc = a[:, 0].mean(0)
+        boot["pc"].append(pc)
+        boot["hit"].append(a[:, 1].mean(0))
+        if kin:
+            t = [thresholds(evs[i], fam, levels, cut(evs[i]), idx, point[i][2]) for i in seeds]
+            boot["t_afc"].append(geometric([x[0] for x in t]))
+            boot["t_det"].append(geometric([x[1] for x in t]))
+        if dur:
+            tr = np.mean([trace(evs[i], fam, levels, idx) for i in seeds], 0)
+            boot["trace"].append(tr)
+            boot["crossing"].append(falls_through(pc, levels, 0.5))
+            boot["trace_half"].append(falls_through(tr, levels, tr[0] / 2))
+    r["pc_lo"], r["pc_hi"] = np.percentile(boot["pc"], [2.5, 97.5], axis=0)
+    r["hit_lo"], r["hit_hi"] = np.percentile(boot["hit"], [2.5, 97.5], axis=0)
+    if kin:
+        for k in ("t_afc", "t_det"):
+            r[k + "_ci"] = np.percentile(boot[k], [2.5, 97.5], method="lower")  # some resamples never reach threshold
+        if ideal and ideal["t_afc"] > 0 and np.isfinite(r["t_afc"]):
+            r["efficiency"] = (ideal["t_afc"] / r["t_afc"]) ** 2  # d' grows in proportion to magnitude near threshold
+            r["efficiency_ci"] = [(ideal["t_afc"] / hi) ** 2 for hi in r["t_afc_ci"][::-1]]
+    if dur:
+        r["trace_lo"], r["trace_hi"] = np.percentile(boot["trace"], [2.5, 97.5], axis=0)
+        r["crossing_ci"] = np.percentile(boot["crossing"], [2.5, 97.5])
+        r["trace_half_ci"] = np.percentile(boot["trace_half"], [2.5, 97.5])
+    return r
+
+
+def xray(group):
+    """The decoded position curves of each seed, by family and by how far through the hidden interval they were read."""
+    rows = [json.loads((p / "xray.json").read_text()) for p in seed_dirs(group) if (p / "xray.json").exists()]
+    if not rows:
+        return None
+    out = {}
+    for fam in DURATION:
+        out[fam] = {}
+        for frac in sorted({x["frac"] for x in rows[0]}):
+            pick = [[x for x in r if x["family"] == fam and x["frac"] == frac] for r in rows]
+            rec = {"D": [x["D"] for x in pick[0]]}
+            for key in ("err_px", "last_seen_px", "line_px", "mass", "mass_no_ball"):
+                a = np.array([[x[key] for x in p] for p in pick])
+                rec[key] = a.mean(0)
+                rec[key + "_seeds"] = a
+            out[fam][str(frac)] = rec
+    return out
 
 
 def summary():
-    out = {"alpha": ALPHA, "families": {}, "sizes": {}, "observers": {}}
+    out = {"alpha": ALPHA, "train_reveal_max": TRAIN_REVEAL_MAX, "families": {}, "sizes": {}, "observers": {}}
     obs = {k: load(RUNS / "observers" / k) for k in OBSERVERS if (RUNS / "observers" / k / "eval.npz").exists()}
-    size_evals = {s: [load(p) for p in seed_dirs(s) if (p / "eval.npz").exists()] for s in SIZES}
-    size_evals = {s: v for s, v in size_evals.items() if v}
+    groups = {g: [load(p) for p in seed_dirs(g) if (p / "eval.npz").exists()] for g in SIZES + CONTROLS}
+    groups = {g: v for g, v in groups.items() if v}
     rng = np.random.default_rng(0)
 
     for fam, spec in E.FAMILIES.items():
@@ -117,61 +214,30 @@ def summary():
         rec = {"levels": levels, "unit": spec["unit"], "observers": {}, "sizes": {}}
         for k, ev in obs.items():
             pc, hit, fa, lbf = curves(ev, fam, levels, cut(ev))
-            rec["observers"][k] = {"pc": pc.tolist(), "hit": hit.tolist(), "fa": fa.tolist(), "lbf": lbf.tolist()}
+            rec["observers"][k] = {"pc": pc, "hit": hit, "fa": fa, "lbf": lbf}
             if fam in KINEMATIC:
-                rec["observers"][k]["t_afc"], rec["observers"][k]["t_det"] = thresholds(ev, fam, levels, cut(ev))
+                rec["observers"][k]["t_afc"], rec["observers"][k]["t_det"], _ = thresholds(ev, fam, levels, cut(ev))
             if fam in DURATION:
-                rec["observers"][k]["carry_over"] = carry_over(pc, levels)
-        for s, evs in size_evals.items():
-            per = [curves(ev, fam, levels, cut(ev)) for ev in evs]
-            arr = np.array(per)  # (seeds, 4, levels)
-            r = {"seeds": len(evs), "pc": arr[:, 0].mean(0).tolist(), "hit": arr[:, 1].mean(0).tolist(), "fa": arr[:, 2].mean(0).tolist(), "lbf": arr[:, 3].mean(0).tolist(), "pc_seeds": arr[:, 0].tolist()}
-            n = len(evs[0][f"{fam}/{levels[0]}/imp_nll"])
-            boot_pc, boot_hit, boot_t, boot_c = [], [], [], []
-            for _ in range(BOOT):
-                seeds = rng.integers(0, len(evs), len(evs))
-                idx = rng.integers(0, n, n)
-                res = [curves(evs[i], fam, levels, cut(evs[i]), idx) for i in seeds]
-                a = np.array(res)
-                boot_pc.append(a[:, 0].mean(0))
-                boot_hit.append(a[:, 1].mean(0))
-                if fam in KINEMATIC:
-                    boot_t.append(np.array([thresholds(evs[i], fam, levels, cut(evs[i]), idx) for i in seeds]))
-                if fam in DURATION:
-                    boot_c.append(np.mean([carry_over(a[j, 0], levels) for j in range(len(seeds))]))
-            r["pc_lo"], r["pc_hi"] = np.percentile(boot_pc, [2.5, 97.5], axis=0).tolist()
-            r["hit_lo"], r["hit_hi"] = np.percentile(boot_hit, [2.5, 97.5], axis=0).tolist()
-            if fam in KINEMATIC:
-                seed_t = np.array([thresholds(ev, fam, levels, cut(ev)) for ev in evs])
-                gm = lambda a: float(np.exp(np.nanmean(np.log(np.where(a > 0, a, np.nan)), axis=-1))) if np.isfinite(a).all() else float("inf")
-                r["t_afc"], r["t_det"] = gm(seed_t[:, 0]), gm(seed_t[:, 1])
-                b = np.array(boot_t)  # (boot, seeds, 2)
-                for j, name in enumerate(("t_afc", "t_det")):
-                    vals = np.array([gm(row[:, j]) for row in b])
-                    r[name + "_ci"] = [float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))]
-                if "ideal" in rec["observers"]:
-                    ti = rec["observers"]["ideal"]["t_afc"]
-                    r["efficiency"] = float((ti / r["t_afc"]) ** 2) if ti > 0 and np.isfinite(r["t_afc"]) else 0.0
-            if fam in DURATION:
-                r["carry_over_seeds"] = [carry_over(arr[i, 0], levels) for i in range(len(evs))]
-                r["carry_over_ci"] = np.percentile(boot_c, [2.5, 97.5]).tolist()
-                ctrl = []
-                for ev in evs:
-                    ctrl.append([float(np.median(ev[f"{fam}/{lv}/imp_nll"][: len(ev[f"{fam}/{lv}/ctrl_nll"])] - ev[f"{fam}/{lv}/ctrl_nll"])) for lv in levels])
-                r["trace_nats"] = np.mean(ctrl, 0).tolist()
-                r["trace_seeds"] = ctrl
-            rec["sizes"][s] = r
+                rec["observers"][k]["crossing"] = falls_through(pc, levels, 0.5)
+        for g, evs in groups.items():
+            rec["sizes"][g] = measure(fam, levels, evs, rng, rec["observers"].get("ideal"))
         out["families"][fam] = rec
 
-    for s, evs in size_evals.items():
-        names = [p.name for p in seed_dirs(s) if (p / "eval.npz").exists()]
-        rep = [json.loads((RUNS / n / "eval.json").read_text()) for n in names]
-        out["sizes"][s] = {"seeds": names, "calibration": rep}
+    for g in groups:
+        names = [p.name for p in seed_dirs(g) if (p / "eval.npz").exists()]
+        out["sizes"][g] = {"seeds": names, "calibration": [json.loads((RUNS / n / "eval.json").read_text()) for n in names], "xray": xray(g)}
     for k in obs:
         out["observers"][k] = json.loads((RUNS / "observers" / k / "eval.json").read_text())
 
+    def plain(x):
+        if isinstance(x, np.ndarray):
+            return x.tolist()
+        if isinstance(x, (np.floating, np.integer)):
+            return x.item()
+        raise TypeError(type(x))
+
     Path("results").mkdir(exist_ok=True)
-    Path("results/summary.json").write_text(json.dumps(out, indent=1, default=float))
+    Path("results/summary.json").write_text(json.dumps(out, indent=1, default=plain))
     return out
 
 

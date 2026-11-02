@@ -1,0 +1,13 @@
+[project]
+name = "surprise-meter"
+version = "1.0.0"
+description = "A tiny recurrent world model trained on pixels, measured like a psychophysics subject"
+requires-python = ">=3.11"
+dependencies = ["mlx>=0.32", "numpy>=2.0", "scipy>=1.14", "matplotlib>=3.9", "pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["sm"]

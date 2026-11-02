@@ -48,3 +48,8 @@ class Null:
     def cut(self, alpha):
         """The evidence level that a fraction alpha of lawful frames reach."""
         return float(self.sorted[min(int(np.ceil(len(self.sorted) * (1 - alpha))), len(self.sorted) - 1)])
+
+    def tail(self, points=256):
+        """Ranks from the top on a log grid and the evidence at each: all a reader of the table needs, in little space."""
+        ranks = np.unique(np.round(np.logspace(0, np.log10(len(self.sorted)), points)).astype(int))
+        return ranks, self.sorted[-ranks].astype(np.float32)

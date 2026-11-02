@@ -20,7 +20,11 @@ from . import model as M
 from . import world as W
 from .train import load_model
 
-CLIPS, T, RIDGE = 600, 32, 1.0
+FIT = [(600, 32), (128, 96)]  # clips, frames; all lawful, so a faint memory stays readable
+RIDGE = 1.0
+SEED = 20261102
+MIN_MASS = 1e-3  # with nothing decoded there is no answer; a real ball is about 8 and an empty state is 0
+FRACTIONS = [0.25, 0.5, 0.75, 1.0]  # where in the hidden interval position is read
 DURATIONS = [4, 8, 12, 16, 20, 24, 28, 32, 40, 48]
 
 
@@ -47,16 +51,17 @@ def fit(model, seed=7):
     rng = np.random.default_rng(seed)
     d = model.cfg.d
     xtx, xty = np.zeros((d + 1, d + 1)), np.zeros((d + 1, M.PDIM))
-    for i in range(0, CLIPS, 64):
-        traj = W.simulate(W.random_scene(rng, 64), T + 1)
-        frames = W.render(traj, rng)[0]
-        states = rollout_states(model, frames[:, :-1])[:, 4:]
-        target = np.array(M.patchify(mx.array(balls_only(traj)[:, 5:]))) - 0.25
-        x = states.reshape(-1, d).astype(np.float64)
-        x = np.concatenate([x, np.ones((len(x), 1))], 1)
-        y = target.reshape(-1, M.PDIM).astype(np.float64)
-        xtx += x.T @ x
-        xty += x.T @ y
+    for clips, T in FIT:
+        for i in range(0, clips, 32):
+            traj = W.simulate(W.random_scene(rng, 32), T + 1)
+            frames = W.render(traj, rng)[0]
+            states = rollout_states(model, frames[:, :-1])[:, 4:]
+            target = np.array(M.patchify(mx.array(balls_only(traj)[:, 5:]))) - 0.25
+            x = states.reshape(-1, d).astype(np.float64)
+            x = np.concatenate([x, np.ones((len(x), 1))], 1)
+            y = target.reshape(-1, M.PDIM).astype(np.float64)
+            xtx += x.T @ x
+            xty += x.T @ y
     sol = np.linalg.solve(xtx + RIDGE * np.eye(d + 1), xty)
     return sol[:-1].T.astype(np.float32), sol[-1].astype(np.float32)  # weight (PDIM, d), bias (PDIM,)
 
@@ -69,32 +74,45 @@ def decode(states, weight, bias):
 
 
 def centroid(img):
-    """Centroid of the bright part of a decoded image, (B, T, H, W) -> (B, T, 2) and its mass."""
+    """Centroid of the bright part of a decoded image, (B, T, H, W) -> (B, T, 2) and its mass. With nothing decoded the
+    answer is the middle of the frame, the best guess of an observer that knows nothing."""
     yy, xx = np.meshgrid(np.arange(W.SIZE) + 0.5, np.arange(W.SIZE) + 0.5, indexing="ij")
     m = np.clip(img - 0.25, 0, None)
     mass = m.sum((-1, -2))
-    cx = (m * xx).sum((-1, -2)) / np.maximum(mass, 1e-6)
-    cy = (m * yy).sum((-1, -2)) / np.maximum(mass, 1e-6)
+    held = mass > MIN_MASS
+    cx = np.where(held, (m * xx).sum((-1, -2)) / np.maximum(mass, 1e-6), W.SIZE / 2)
+    cy = np.where(held, (m * yy).sum((-1, -2)) / np.maximum(mass, 1e-6), W.SIZE / 2)
     return np.stack([cx, cy], -1), mass
 
 
 def hidden_error(model, weight, bias, scenes=96):
-    """Decoded position error at the end of each hidden interval, against dead reckoning and the last seen position."""
+    """Decoded position error during each hidden interval, against two readers with no state: the last seen position,
+    and a straight line from there, which is exact until a bounce. Also the same read of a model that never saw a ball."""
     rows = []
-    for j, D in enumerate(DURATIONS):
-        rng = np.random.default_rng([2027, j])
-        p = E.vanish(rng, scenes, D)
-        states = rollout_states(model, p.lawful)
-        dec = decode(states, weight, bias)
-        pos, mass = centroid(dec)
-        last = p.window[:, 0] - 1  # last fully hidden frame of the lawful twin; prediction made there is of the next frame
-        ix = np.arange(scenes)
-        truth = p.law.pos[ix, last + 1, 0]
-        err = np.linalg.norm(pos[ix, last] - truth, axis=-1)
-        entered = p.window[:, 0] - D - 1
-        stale = np.linalg.norm(p.law.pos[ix, entered, 0] - truth, axis=-1)
-        rows.append({"D": D, "err_px": float(np.median(err)), "err_q": np.percentile(err, [25, 75]).tolist(), "last_seen_px": float(np.median(stale)), "mass": float(np.median(mass[ix, last]))})
-        print(rows[-1], flush=True)
+    for fam, fn in (("vanish", E.vanish), ("rebound", E.rebound)):
+        for j, D in enumerate(DURATIONS):
+            p = fn(np.random.default_rng([SEED, sorted(E.FAMILIES).index(fam), j]), scenes, D)
+            pos, mass = centroid(decode(rollout_states(model, p.lawful), weight, bias))
+            none = centroid(decode(rollout_states(model, p.control[:scenes]), weight, bias))[1]
+            ix = np.arange(scenes)
+            entered = p.window[:, 0] - D - 1  # the last frame with the ball in view
+            for frac in FRACTIONS:
+                read = entered + np.maximum(np.round(frac * D).astype(int), 1)  # what is read here predicts the next frame
+                truth = p.law.pos[ix, read + 1, 0]
+                seen = p.law.pos[ix, entered, 0]
+                line = seen + p.law.scene.vel[ix, 0] * (read + 1 - entered)[:, None]
+                err = np.linalg.norm(pos[ix, read] - truth, axis=-1)
+                rows.append({
+                    "family": fam,
+                    "D": D,
+                    "frac": frac,
+                    "err_px": float(np.median(err)),
+                    "err_q": np.percentile(err, [25, 75]).tolist(),
+                    "last_seen_px": float(np.median(np.linalg.norm(seen - truth, axis=-1))),
+                    "line_px": float(np.median(np.linalg.norm(line - truth, axis=-1))),
+                    "mass": float(np.median(mass[ix, read])),
+                    "mass_no_ball": float(np.median(none[ix, read])),
+                })
     return rows
 
 

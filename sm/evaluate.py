@@ -21,8 +21,9 @@ from . import surprise as S
 from . import world as W
 from .train import load_model
 
+SEED = 20261102  # the design was chosen on other scenes; everything reported comes from these
 SCENES = 192
-NULL_CLIPS, NULL_T = 2000, 96
+NULL_CLIPS, NULL_T = 10000, 96
 ALPHAS = [1e-2, 1e-3, 1e-4]
 
 
@@ -97,9 +98,11 @@ class ReferenceObserver:
         self.kind = kind
 
     def _traj(self, traj, frames, truth=None):
-        """Score frames against a prediction: the given lawful clean frames for the ideal, else a tracker's guess."""
-        clean, vis = W.render(traj if truth is None else truth)
-        pred = clean if self.kind == "ideal" else O.predict(traj, vis, self.kind)
+        """Score frames against a prediction: the lawful clean frames for the ideal, else a tracker of what is on screen."""
+        if self.kind == "ideal":
+            pred = W.render(traj if truth is None else truth)[0]
+        else:
+            pred = O.predict(traj, W.render(traj)[1], self.kind)
         B, T = frames.shape[:2]
         nll, ev = np.full((B, T), np.nan, np.float32), np.full((B, T), np.nan, np.float32)
         sigma = np.full((B, W.SIZE, W.SIZE), W.NOISE, np.float32)
@@ -128,7 +131,7 @@ def window_max(a, win):
 
 def null_frames(observer):
     """Held-out lawful evidence, and a tag per frame for what was happening. Fixed scenes for every observer."""
-    rng = np.random.default_rng([2026, 11, 1])
+    rng = np.random.default_rng([SEED, 1])
     ev, tags = [], []
     for i in range(0, NULL_CLIPS, 128):
         traj = W.simulate(W.random_scene(rng, 128), NULL_T)
@@ -147,7 +150,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("who")
     ap.add_argument("--out", default=None)
-    ap.add_argument("--families", default=None)
+    ap.add_argument("--families", default=None, help="comma separated; with an existing eval.npz, replaces just these")
     a = ap.parse_args()
 
     if a.who in ("ideal", *O.KINDS):
@@ -159,24 +162,29 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
 
-    ev, tags = null_frames(observer)
-    half = len(ev) // 2
-    calib = S.Null(ev[:half].ravel())
-    res = {"null_sorted": calib.sorted.astype(np.float32)}
-    test_p = calib.p(ev[half:].ravel())
-    report = {"null_frames": int(ev.size), "observer": a.who, "alphas": ALPHAS}
-    report["fa_test"] = {str(al): float((test_p <= al).mean()) for al in ALPHAS}
-    t = tags[half:].reshape(-1, 3)
-    for name, m in (("contact", t[:, 0]), ("edge", t[:, 1]), ("reveal", t[:, 2]), ("quiet", ~t.any(-1))):
-        report[f"fa_{name}"] = {str(al): float((test_p[m] <= al).mean()) for al in ALPHAS}
-        report[f"n_{name}"] = int(m.sum())
-    print(f"null {ev.size} frames, cut@1e-3 {calib.cut(1e-3):.1f} ({time.time() - t0:.0f}s)", flush=True)
+    if a.families and (out / "eval.npz").exists():  # measure these families again and keep everything else
+        res = dict(np.load(out / "eval.npz"))
+        report = json.loads((out / "eval.json").read_text())
+    else:
+        ev, tags = null_frames(observer)
+        half = len(ev) // 2
+        calib = S.Null(ev[:half].ravel())
+        res = dict(zip(("null_ranks", "null_tail"), calib.tail()))
+        res["null_n"] = len(calib.sorted)
+        test_p = calib.p(ev[half:].ravel())
+        report = {"null_frames": int(ev.size), "observer": a.who, "alphas": ALPHAS}
+        report["fa_test"] = {str(al): float((test_p <= al).mean()) for al in ALPHAS}
+        t = tags[half:].reshape(-1, 3)
+        for name, m in (("contact", t[:, 0]), ("edge", t[:, 1]), ("reveal", t[:, 2]), ("quiet", ~t.any(-1))):
+            report[f"fa_{name}"] = {str(al): float((test_p[m] <= al).mean()) for al in ALPHAS}
+            report[f"n_{name}"] = int(m.sum())
+        print(f"null {ev.size} frames, cut@1e-3 {calib.cut(1e-3):.1f} ({time.time() - t0:.0f}s)", flush=True)
 
     fams = a.families.split(",") if a.families else list(E.FAMILIES)
     for fam in fams:
         spec = E.FAMILIES[fam]
         for j, level in enumerate(spec["levels"]):
-            rng = np.random.default_rng([2026, sorted(E.FAMILIES).index(fam), j])
+            rng = np.random.default_rng([SEED, 2, sorted(E.FAMILIES).index(fam), j])
             p = spec["fn"](rng, SCENES, level)
             nl, el, ni, ei = observer.twins(p)
             key = f"{fam}/{level}"
@@ -185,6 +193,7 @@ def main():
             res[f"{key}/law_ev"] = window_max(el, p.window)
             res[f"{key}/imp_ev"] = window_max(ei, p.window)
             res[f"{key}/frames"] = p.window[:, 1] - p.window[:, 0]
+            res[f"{key}/speed"] = np.linalg.norm(p.law.scene.vel[:, 0], axis=-1)
             if p.duration and isinstance(observer, ModelObserver):
                 cn, ce = observer.score(p.control)
                 w = p.window[: len(p.control)]

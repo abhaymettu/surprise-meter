@@ -16,14 +16,18 @@ RUNS = Path("runs")
 STEPS = {"1m": 20000, "5m": 20000, "20m": 20000}
 
 
-def job(size, seed, blank=0.0, name=None):
-    return {"name": name or f"{size}-s{seed}", "size": size, "seed": seed, "blank": blank}
+def job(size, seed, window=None):
+    """`window` swaps the recurrent state for attention over that many past frames, so memory has a known length."""
+    return {"name": f"{size}-window{window}-s{seed}" if window else f"{size}-s{seed}", "size": size, "seed": seed, "window": window}
 
 
 PLAN = [
-    *[job("1m", s) for s in range(5)],
+    job("1m", 0),
+    job("5m", 0),
+    *[job("1m", s) for s in range(1, 5)],
     job("20m", 0),
-    *[job("5m", s) for s in range(5)],
+    *[job("5m", s) for s in range(1, 5)],
+    *[job("1m", s, window=8) for s in range(2)],
     *[job("20m", s) for s in range(1, 5)],
 ]
 
@@ -50,10 +54,11 @@ def main():
             print(f"{j['name']:16s} trained={trained} measured={measured}")
             continue
         if not trained:
-            run("sm.train", "--size", j["size"], "--seed", str(j["seed"]), "--steps", str(STEPS[j["size"]]), "--blank", str(j["blank"]), "--out", str(d))
+            arch = ["--arch", "window", "--window", str(j["window"])] if j["window"] else []
+            run("sm.train", "--size", j["size"], "--seed", str(j["seed"]), "--steps", str(STEPS[j["size"]]), "--out", str(d), *arch)
         if not measured:
             run("sm.evaluate", str(d))
-        if not (d / "xray.safetensors").exists():
+        if not j["window"] and not (d / "xray.json").exists():
             run("sm.xray", str(d))
     if a.list:
         return

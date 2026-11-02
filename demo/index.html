@@ -57,10 +57,17 @@
   .foot a { color: var(--dim); text-underline-offset: 2px; }
 
   @media (max-width: 880px) {
-    main { grid-template-columns: minmax(0, 1fr); }
+    main { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    aside { display: contents; }
+    .intro { order: -1; }
     .stage-wrap { max-height: none; max-width: none; }
-    #oneIn { font-size: 34px; }
-    .meter small { min-height: 0; }
+    .meter { padding: 10px 12px 8px; }
+    #oneIn { font-size: 30px; }
+    .meter small { min-height: 2.8em; font-size: 12.5px; }
+    #trace { height: 68px; margin-top: 6px; }
+    .views { order: 2; }
+    .foot { order: 3; }
+    #caption { font-size: 14px; left: 12px; right: 12px; bottom: 10px; }
   }
   @media (prefers-reduced-motion: reduce) {
     button { transition: none; }
@@ -75,7 +82,7 @@
     <div id="caption"></div>
   </div>
   <aside>
-    <div>
+    <div class="intro">
       <h1>Surprise Meter</h1>
       <p class="lede">A small neural network learned this world from pixels. It is running on your machine, guessing every frame before it sees it. Break the physics and watch it stop believing you.</p>
     </div>
@@ -85,7 +92,7 @@
       <canvas id="trace"></canvas>
     </div>
     <div class="views">
-      <figure><canvas id="vSaw" width="32" height="32"></canvas><figcaption>What it saw, 32 by 32</figcaption></figure>
+      <figure><canvas id="vSaw" width="32" height="32"></canvas><figcaption>What it saw</figcaption></figure>
       <figure><canvas id="vExp" width="32" height="32"></canvas><figcaption>What it expected</figcaption></figure>
       <figure><canvas id="vErr" width="32" height="32"></canvas><figcaption>Where it was wrong</figcaption></figure>
     </div>

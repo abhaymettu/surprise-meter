@@ -19,7 +19,7 @@ import numpy as np
 
 from . import world as W
 
-CONTROL_CLIPS = 64
+CONTROL_CLIPS = 192
 REVEAL_PX = 3.0  # an occluded event is scored until the lawful ball has come this far out
 
 
@@ -376,10 +376,10 @@ def collision(rng, B, m, T=24, length=8):
 
 FAMILIES = {
     "teleport": dict(fn=teleport, levels=[0.02, 0.04, 0.08, 0.15, 0.25, 0.5, 1.0, 2.0, 4.0], unit="px"),
-    "deflect": dict(fn=deflect, levels=[0.5, 1, 2, 4, 8, 16, 32, 64, 180], unit="deg"),
+    "deflect": dict(fn=deflect, levels=[0.12, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 180], unit="deg"),
     "phantom": dict(fn=phantom, levels=[0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 6.0], unit="px"),
     "passthrough": dict(fn=passthrough, levels=[1.0], unit=""),
-    "collision": dict(fn=collision, levels=[0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0], unit="restitution error"),
+    "collision": dict(fn=collision, levels=[0.003, 0.01, 0.03, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0], unit="restitution error"),
     "vanish": dict(fn=vanish, levels=[1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48], unit="frames"),
     "rebound": dict(fn=rebound, levels=[6, 8, 12, 16, 20, 24, 28, 32, 40, 48], unit="frames"),
     "hidden": dict(fn=lambda rng, B, d: hidden(rng, B, 12, d), levels=[0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 3.0], unit="px"),

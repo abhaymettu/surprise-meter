@@ -1,5 +1,5 @@
 import { SIZE, NOISE, randomScene, step as stepWorld, render as renderWorld } from "./world.js";
-import { loadWeights, GpuEngine, CpuEngine } from "./engine.js";
+import { loadWeights, GpuEngine, WorkerEngine } from "./engine.js";
 
 const $ = (id) => document.getElementById(id);
 const TICK_MS = 50, BURN_IN = 4, REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -28,7 +28,7 @@ function evidence(frame, mean, sigma) {
 function oneIn(m) {
   const { evidence: e, one_in: o } = nullTable, n = e.length;
   if (m <= e[n - 1]) return o[n - 1];
-  if (m >= e[0]) return o[0] * Math.exp((m - e[0]) / 25); // past the table: keep rising, marked as off the scale in the UI
+  if (m >= e[0]) return o[0]; // stranger than every frame in the table, and the table is all that was measured
   let lo = 0, hi = n - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
@@ -38,17 +38,21 @@ function oneIn(m) {
   return Math.exp(Math.log(o[lo]) + f * (Math.log(o[hi]) - Math.log(o[lo])));
 }
 
-const LOG_TOP = 6; // the meter's scale tops out at 1 in a million
-const level = (n) => Math.min(Math.log10(Math.max(n, 1)) / LOG_TOP, 1.15);
+let LOG_TOP = 6, TOP = 1e6; // the scale ends where the calibration table does
+const level = (n) => Math.min(Math.log10(Math.max(n, 1)) / LOG_TOP, 1);
+const SPIKE = 3000; // about one lawful frame in three minutes gets this far
+
+function twoFigures(n) {
+  const d = 10 ** Math.max(0, Math.floor(Math.log10(n)) - 1);
+  return (Math.floor(n / d) * d).toLocaleString("en-US");
+}
 
 function fmtOneIn(n) {
-  if (n >= 1e6) return "off the scale";
-  const d = 10 ** Math.max(0, Math.floor(Math.log10(n)) - 1);
-  return `1 in ${(Math.round(n / d) * d).toLocaleString("en-US")}`;
+  return n >= TOP ? `1 in ${twoFigures(TOP)}+` : `1 in ${twoFigures(Math.max(n, 1))}`;
 }
 
 function meaning(n) {
-  if (n >= 1e6) return "Rarer than anything in the million lawful frames this was calibrated on. The model does not think this can happen.";
+  if (n >= TOP) return `Stranger than all ${twoFigures(TOP)} lawful frames this was calibrated on.`;
   if (n >= 1e4) return "Almost never happens when the physics is real. The model is confident something is wrong.";
   if (n >= 300) return "Unusual. Lawful physics gets here only now and then.";
   return "Nothing unusual. One in this many lawful frames looks at least this strange.";
@@ -100,7 +104,7 @@ async function tick() {
     if (last && age >= BURN_IN) {
       const e = evidence(frame, last.mean, last.sigma);
       n = oneIn(e.best);
-      if (level(n) > 0.45) surpriseSpot = { x: e.bx, y: e.by, a: Math.max(surpriseSpot.a, level(n)) };
+      if (n >= SPIKE) surpriseSpot = { x: e.bx, y: e.by, a: Math.max(surpriseSpot.a, level(n)) };
       drawViews(frame, last.mean, e.excess);
     }
     pushTrace(n);
@@ -120,6 +124,7 @@ function respawnIfEmpty() {
   const r = 2 + Math.random(), a = Math.random() * 6.28, s = 0.3 + Math.random() * 0.5;
   world.balls = [{ x: 16 + (Math.random() - 0.5) * 16, y: 16 + (Math.random() - 0.5) * 16, vx: s * Math.cos(a), vy: s * Math.sin(a), r, lum: 0.9, alive: true, id: nextId++ }];
   mark("a ball from nowhere");
+  caption("A new ball, out of nothing. That is what the spike is.");
   emptySince = 0;
 }
 
@@ -158,7 +163,7 @@ uniform float uOccOn[2];
 uniform sampler2D uXray;    // the model's occluder-free picture of the next frame
 uniform sampler2D uErr;     // where it was wrong
 uniform vec3 uSpot;         // surprise bloom x, y, strength
-uniform float uRes, uTime, uHasX;
+uniform float uRes, uTime, uHasX, uPeak, uSure;
 
 float box(vec2 q, vec4 r, float aa){
   float d = max(max(r.x-q.x, q.x-r.y), max(r.z-q.y, q.y-r.w));
@@ -209,12 +214,13 @@ void main(){
     c = mix(c, slab+hatch, cover);
   }
 
-  // the model's belief, drawn only behind slabs: a hollow ring-like glow, a different shape from a real ball
-  if(uHasX>.5 && cover>0.){
+  // the model's belief, drawn only behind slabs: a thin contour around a faint fill, never mistaken for a solid ball
+  if(uHasX>.5 && cover>0. && uSure>0.){
     float v = cubic(uXray, uv).r;
-    float glow = smoothstep(.08,.55,v);
-    float rim = glow*(1.-smoothstep(.35,.85,v));
-    c += cover*(rim*vec3(.85,.9,1.)*.95 + glow*vec3(.25,.28,.34));
+    float iso = uPeak*.58;
+    float grad = max(length(vec2(dFdx(v),dFdy(v))),1e-4);
+    float line = exp(-pow((v-iso)/grad/(uRes/820.),2.));
+    c += cover*uSure*(line*vec3(.92,.95,1.)*.85 + smoothstep(iso*.55,iso*1.15,v)*vec3(.07,.08,.095));
   }
 
   // where the model was wrong
@@ -287,7 +293,7 @@ function uploadField(tex, unit, a) {
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 32, 32, gl.RED, gl.UNSIGNED_BYTE, bytes);
 }
 
-let lastTickAt = 0, lastDraw = performance.now();
+let lastTickAt = 0, lastDraw = performance.now(), shownPeak = 0, shownMass = 0;
 
 function resize() {
   const r = stage.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
@@ -327,6 +333,21 @@ function draw(now) {
     errShown[i] += (errTarget[i] - errShown[i]) * k;
     errTarget[i] *= Math.exp(-dt / 0.22);
   }
+  // How much ball the state holds behind the slabs, which gates the outline. Measured on held-out clips: 0.9 for a ball
+  // hidden 16 frames, 0.2 six frames after the reveal that never came, zero by ten, under 0.13 with no ball at all.
+  let peak = 0, mass = 0;
+  for (const o of world.occ) {
+    for (let y = 0; y < 32; y++) for (let x = Math.max(0, Math.ceil(o.x0)); x < Math.min(32, o.x1); x++) {
+      const v = xrayShown[y * 32 + x];
+      peak = Math.max(peak, v);
+      mass += Math.max(0, v - 0.25);
+    }
+  }
+  shownMass += (mass - shownMass) * (1 - Math.exp(-dt / 0.12));
+  shownPeak = peak;
+  const t = Math.max(0, Math.min(1, (shownMass - 0.2) / 0.4));
+  gl.uniform1f(U("uPeak"), peak);
+  gl.uniform1f(U("uSure"), t * t * (3 - 2 * t));
   uploadField(texX, 0, xrayShown);
   uploadField(texE, 1, errShown);
   surpriseSpot.a *= Math.exp(-dt / 0.42);
@@ -355,7 +376,7 @@ function drawMeter(now, f) {
 
   c.font = `${11 * dpr}px ui-sans-serif, -apple-system, sans-serif`;
   c.textBaseline = "bottom";
-  for (const [l, label] of [[2, "1 in 100"], [4, "1 in 10,000"], [6, "1 in a million"]]) {
+  for (const [l, label] of [[2, "1 in 100"], [4, "1 in 10,000"], [LOG_TOP, `all ${twoFigures(TOP)} lawful frames`]]) {
     const yy = Math.round(y(l / LOG_TOP)) + 0.5;
     c.strokeStyle = "#23262b";
     c.lineWidth = dpr;
@@ -407,7 +428,7 @@ function drawMeter(now, f) {
     if (elN.textContent !== t) elN.textContent = t;
     const mean = meaning(shownN);
     if (elM.textContent !== mean) elM.textContent = mean;
-    elN.style.color = peakLevel > 0.62 ? "var(--spike)" : "var(--ink)";
+    elN.style.color = peakLevel > level(SPIKE) ? "var(--spike)" : "var(--ink)";
   }
 }
 
@@ -495,15 +516,15 @@ const key = (id, fn) => $(id).addEventListener("keydown", (e) => { if (e.key ===
 const both = (id, fn) => { act(id, fn); key(id, fn); };
 
 both("aVanish", () => {
-  if (!world.occ.length) { world.occ = [{ x0: 10, x1: 21, y0: 0, y1: SIZE, lum: 0.45 }]; mark("a slab from nowhere"); }
   wantVanish = !wantVanish;
+  if (wantVanish && !crossingSoon()) { occludedScene(); wantVanish = true; }
   caption(wantVanish ? "Waiting for a ball to go fully behind a slab, then it is deleted." : "");
 });
 both("aReverse", () => { for (const b of world.balls) { b.vx *= -1; b.vy *= -1; } mark("reversed"); caption("Everything turned around with nothing to hit."); });
 both("aWalls", () => { world.wallsOn = !world.wallsOn; mark(world.wallsOn ? "walls back" : "walls off"); caption(world.wallsOn ? "" : "Now watch a ball reach the edge. It keeps going, and the model expected a bounce."); });
 both("aFreeze", () => { frozen = !frozen; mark(frozen ? "froze" : "released"); caption(frozen ? "Stopped dead, mid-flight. It expected the next frame to be different." : ""); });
 both("aGhost", () => { world.collide = world.collide === false ? true : false; mark(world.collide === false ? "no collisions" : "collisions back"); if (world.collide === false) caption("Solid things now pass through each other."); });
-both("aNew", () => { frozen = false; newWorld({}); caption(""); });
+both("aNew", () => { frozen = false; newWorld({ occluders: 1 + (Math.random() < 0.25) }); caption(""); });
 
 // ---- first visit: show the idea without asking for anything ----------------------------------------------------------
 
@@ -519,6 +540,13 @@ function caption(text, ms = 5200) {
 let attract = true;
 function stopAttract() { attract = false; }
 
+function crossingSoon() {
+  return world.balls.some((b) => b.alive && (hiddenFully(b) || world.occ.some((o) => {
+    const enter = b.vx > 0 ? (o.x0 + b.r + 1 - b.x) / b.vx : b.vx < 0 ? (o.x1 - b.r - 1 - b.x) / b.vx : Infinity;
+    return enter > 0 && enter < 70 && o.x1 - o.x0 > 2 * b.r + 2;
+  })));
+}
+
 function occludedScene() {
   // one ball crossing one slab, the demo's central case
   const w = 10 + Math.random() * 2, x0 = 11 + Math.random() * 2;
@@ -529,19 +557,20 @@ function occludedScene() {
   world = { balls: [{ x, y: 8 + Math.random() * 16, vx: dir * v, vy: (Math.random() - 0.5) * 0.18, r, lum: 0.92, alive: true, id: nextId++ }], occ: [{ x0, x1: x0 + w, y0: 0, y1: SIZE, lum: 0.45 }], wallsOn: true };
   needsReset = true;
   prev = curr = null;
+  wantVanish = false;
 }
 
 async function attractLoop() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   while (attract) {
     occludedScene();
-    caption("A ball goes behind the slab. The glow is the model's own picture of where it thinks the ball is.", 0);
+    caption("A ball goes behind the slab. The outline is the model's own picture of where it thinks the ball is.", 0);
     let hid = false;
     for (let i = 0; i < 300 && attract && !hid; i++) { await wait(50); hid = world.balls[0].alive && hiddenFully(world.balls[0]); }
     if (!attract) break;
     for (let i = 0; i < 300 && attract && hiddenFully(world.balls[0]); i++) await wait(50);
     if (!attract) break;
-    caption("It comes out about where the glow said it would.", 0);
+    caption("It comes out about where the outline said it would.", 0);
     await wait(2600);
     if (!attract) break;
     occludedScene();
@@ -550,13 +579,14 @@ async function attractLoop() {
     uiState();
     for (let i = 0; i < 400 && attract && wantVanish; i++) await wait(50);
     if (!attract) break;
-    await wait(3600);
+    await wait(2400);
     if (!attract) break;
-    caption("Nothing comes out. With no ball to confirm it, the picture fades. That is how long it held on.", 0);
-    await wait(3400);
+    caption("Nothing comes out. With no ball to confirm it, the picture fades within about half a second.", 0);
+    await wait(2800);
     if (!attract) break;
+    newWorld({ balls: 2, occluders: 1 });
     caption("Your turn. Drag a ball somewhere it could not have gone and watch the meter.", 0);
-    await wait(4200);
+    await wait(6000);
   }
   caption("", 0);
 }
@@ -570,13 +600,22 @@ async function start() {
   loop();
   try {
     const params = new URLSearchParams(location.search);
-    const weights = await loadWeights(params.get("model") ?? "./model");
+    let weights = null;
+    if (params.get("engine") !== "cpu" && navigator.gpu) {
+      weights = await loadWeights(params.get("model") ?? "./model");
+      engine = await GpuEngine.create(weights).catch(() => null);
+    }
+    if (!engine) {
+      const url = params.get("cpuModel") ?? "./model-cpu";
+      weights = await fetch(`${url}.json`).then((r) => r.json());
+      engine = new WorkerEngine(url);
+    }
     nullTable = weights.null;
-    engine = params.get("engine") === "cpu" ? null : await GpuEngine.create(weights).catch(() => null);
-    if (!engine) engine = new CpuEngine(weights);
+    TOP = nullTable.one_in[0];
+    LOG_TOP = Math.log10(TOP);
     needsReset = true;
     const m = (weights.params / 1e6).toFixed(1);
-    $("status").textContent = engine.kind === "webgpu" ? `${m}M parameters, WebGPU, on your GPU.` : `${m}M parameters on your CPU, no WebGPU here.`;
+    $("status").textContent = engine.kind === "webgpu" ? `${m}M parameters, WebGPU, on your GPU.` : `${m}M parameters on your CPU, because this browser has no WebGPU.`;
     window.__ready = true;
     if (!params.has("noattract")) attractLoop();
   } catch (err) {
@@ -584,4 +623,4 @@ async function start() {
   }
 }
 start();
-window.__sm = { get world() { return world; }, get last() { return last; }, get n() { return shownN; }, engineKind: () => engine?.kind };
+window.__sm = { get world() { return world; }, get last() { return last; }, get n() { return shownN; }, get peak() { return shownPeak; }, get mass() { return shownMass; }, engineKind: () => engine?.kind };

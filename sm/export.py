@@ -35,9 +35,8 @@ def main():
         meta[name] = {"shape": list(t.shape), "offset": offset, "count": int(arr.size)}
         offset += arr.size
 
-    ev = np.load(run / "eval.npz")["null_sorted"]
-    grid = np.unique(np.round(np.logspace(0, np.log10(len(ev)), 96)).astype(int))  # rank from the top
-    table = {"evidence": [float(ev[len(ev) - r]) for r in grid], "one_in": [float((len(ev) + 1) / r) for r in grid]}
+    ev = np.load(run / "eval.npz")
+    table = {"evidence": ev["null_tail"].tolist(), "one_in": ((int(ev["null_n"]) + 1) / ev["null_ranks"]).tolist()}
 
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -53,7 +52,7 @@ def main():
     mean, sigma, _ = model(mx.array(frames))
     T = frames.shape[1]
     flat = lambda a: np.array(M.unpatchify(a[:, :, :, 0].reshape(1, T * M.TOKENS, M.PDIM), T))[0]
-    (out.parent / "parity.json").write_text(json.dumps({"frames": np.round(frames[0], 5).tolist(), "mean": np.round(flat(mean), 5).tolist(), "sigma": np.round(flat(sigma), 5).tolist()}))
+    out.with_suffix(".parity.json").write_text(json.dumps({"frames": np.round(frames[0], 5).tolist(), "mean": np.round(flat(mean), 5).tolist(), "sigma": np.round(flat(sigma), 5).tolist()}))
     print(f"{out}.bin {offset * 2 / 1e6:.1f} MB, {M.count_params(model) / 1e6:.2f}M params")
 
 

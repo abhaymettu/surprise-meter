@@ -311,3 +311,22 @@ export class GpuEngine {
     return decode(out, xr);
   }
 }
+
+// The CPU path runs off the main thread so the stage keeps its frame rate.
+export class WorkerEngine {
+  constructor(url) {
+    this.kind = "cpu";
+    this.worker = new Worker(new URL("./cpu-worker.js", import.meta.url), { type: "module" });
+    this.worker.postMessage({ url });
+    this.waiting = null;
+    this.worker.onmessage = (e) => { const r = this.waiting; this.waiting = null; r?.(e.data); };
+  }
+  reset() { this.worker.postMessage({ reset: true }); }
+  step(frame) {
+    return new Promise((resolve) => {
+      this.waiting = resolve;
+      const copy = Float32Array.from(frame);
+      this.worker.postMessage({ frame: copy }, [copy.buffer]);
+    });
+  }
+}
