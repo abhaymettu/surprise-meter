@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 SIZE = 32  # frames are SIZE x SIZE pixels
-NOISE = 0.04  # std of the iid Gaussian pixel noise added to every rendered frame
+NOISE = 0.15  # std of the iid Gaussian pixel noise added to every rendered frame
 MAX_BALLS = 2
 MAX_OCC = 2
 CROSSING = 0.5  # fraction of occluded scenes that start with a ball heading for the occluder
@@ -228,6 +228,23 @@ def train_batch(rng, B, T):
     traj = simulate(random_scene(rng, B), T)
     frames, _ = render(traj, rng)
     return frames
+
+
+def blank_mask(rng, B, T, rate, max_len=24):
+    """(B, T, 16) observation dropout: with probability `rate` a clip loses one stretch of frames, either whole
+    frames or a tube of one or two patch columns, starting after the velocity could have been seen."""
+    mask = np.zeros((B, T, 16), np.float32)
+    for b in np.nonzero(rng.random(B) < rate)[0]:
+        n = rng.integers(1, max_len + 1)
+        t0 = rng.integers(4, max(T - 1 - n, 5))
+        if rng.random() < 0.5:
+            mask[b, t0 : t0 + n] = 1
+        else:
+            c = rng.integers(0, 4)
+            cols = [c, min(c + 1, 3)] if rng.random() < 0.5 else [c]
+            for col in cols:
+                mask[b, t0 : t0 + n, col :: 4] = 1
+    return mask
 
 
 def with_scene(traj, **kw):

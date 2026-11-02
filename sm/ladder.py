@@ -1,0 +1,61 @@
+"""Train and measure every model behind the results, in order. Safe to stop and rerun: finished work is skipped.
+
+    python -m sm.ladder            # everything in PLAN, then the reference observers, then the summary
+    python -m sm.ladder --list     # what is done and what is left
+
+Each entry is one run directory: a size, a seed and a training regime. The plan is the experiment.
+"""
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+RUNS = Path("runs")
+STEPS = {"1m": 20000, "5m": 20000, "20m": 20000}
+
+
+def job(size, seed, blank=0.0, name=None):
+    return {"name": name or f"{size}-s{seed}", "size": size, "seed": seed, "blank": blank}
+
+
+PLAN = [
+    job("5m", 0),
+    *[job("1m", s) for s in range(5)],
+    job("20m", 0),
+    *[job("5m", s) for s in range(1, 5)],
+    *[job("20m", s) for s in range(1, 5)],
+]
+
+
+def run(*cmd):
+    print("$", " ".join(cmd), flush=True)
+    subprocess.run([sys.executable, "-m", *cmd], check=True)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--list", action="store_true")
+    a = ap.parse_args()
+    for j in PLAN:
+        d = RUNS / j["name"]
+        trained, measured = (d / "final.safetensors").exists(), (d / "eval.npz").exists()
+        if a.list:
+            print(f"{j['name']:16s} trained={trained} measured={measured}")
+            continue
+        if not trained:
+            run("sm.train", "--size", j["size"], "--seed", str(j["seed"]), "--steps", str(STEPS[j["size"]]), "--blank", str(j["blank"]), "--out", str(d))
+        if not measured:
+            run("sm.evaluate", str(d))
+        if not (d / "xray.safetensors").exists():
+            run("sm.xray", str(d))
+    if a.list:
+        return
+    for kind in ("ideal", "cv", "cv0"):
+        if not (RUNS / "observers" / kind / "eval.npz").exists():
+            run("sm.evaluate", kind)
+    run("sm.analyze")
+
+
+if __name__ == "__main__":
+    main()

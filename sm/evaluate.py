@@ -31,8 +31,8 @@ class ModelObserver:
         self.model = model
         if isinstance(model, M.RecurrentModel):
             def step(state, patches, target):
-                state, mean, sigma = model.step(state, patches)
-                nll, ev = S.frame_stats(target, M.unpatchify(mean, 1)[:, 0], M.unpatchify(sigma, 1)[:, 0])
+                state, mean, sigma, logit = model.step(state, patches)
+                nll, ev = S.evidence(*M.patch_nll(mean, sigma, logit, target))
                 return state, nll, ev
 
             self._step = mx.compile(step)
@@ -44,7 +44,7 @@ class ModelObserver:
         x = mx.array(frames)
         p = M.patchify(x)
         for t in range(t0, T):
-            state, n, m = self._step(state, p[:, (t - 1) * M.TOKENS : t * M.TOKENS], x[:, t])
+            state, n, m = self._step(state, p[:, (t - 1) * M.TOKENS : t * M.TOKENS], p[:, t * M.TOKENS : (t + 1) * M.TOKENS])
             mx.eval(state, n, m)
             nll[:, t], ev[:, t] = np.array(n), np.array(m)
         return nll, ev
@@ -57,11 +57,13 @@ class ModelObserver:
     def _score(self, frames):
         if not isinstance(self.model, M.RecurrentModel):
             x = mx.array(frames)
-            mean, sigma = self.model(x[:, :-1])
+            mean, sigma, logit = self.model(x[:, :-1])
+            p = M.patchify(x)
             B, T = frames.shape[:2]
             nll, ev = np.full((B, T), np.nan, np.float32), np.full((B, T), np.nan, np.float32)
             for t in range(1, T):
-                n, m = S.frame_stats(x[:, t], mean[:, t - 1], sigma[:, t - 1])
+                target = p[:, t * M.TOKENS : (t + 1) * M.TOKENS]
+                n, m = S.evidence(*M.patch_nll(mean[:, t - 1], sigma[:, t - 1], logit[:, t - 1], target))
                 mx.eval(n, m)
                 nll[:, t], ev[:, t] = np.array(n), np.array(m)
             return nll, ev
@@ -83,32 +85,30 @@ class ModelObserver:
                 x = mx.array(head[:, : fork - 1])
                 pp = M.patchify(x)
                 for t in range(fork - 1):
-                    state, _, _ = self.model.step(state, pp[:, t * M.TOKENS : (t + 1) * M.TOKENS])
+                    state = self.model.step(state, pp[:, t * M.TOKENS : (t + 1) * M.TOKENS])[0]
                     mx.eval(state)
             out[0, rows], out[1, rows] = self._roll(p.lawful[rows], state, fork)
             out[2, rows], out[3, rows] = self._roll(p.impossible[rows], state, fork)
         return tuple(out)
 
 
-class IdealObserver:
+class ReferenceObserver:
     def __init__(self, kind):
         self.kind = kind
 
-    def _traj(self, traj, frames):
-        vis = W.render(traj)[1]
-        pred = O.predict(traj, vis, self.kind)
+    def _traj(self, traj, frames, truth=None):
+        """Score frames against a prediction: the given lawful clean frames for the ideal, else a tracker's guess."""
+        clean, vis = W.render(traj if truth is None else truth)
+        pred = clean if self.kind == "ideal" else O.predict(traj, vis, self.kind)
         B, T = frames.shape[:2]
         nll, ev = np.full((B, T), np.nan, np.float32), np.full((B, T), np.nan, np.float32)
         sigma = np.full((B, W.SIZE, W.SIZE), W.NOISE, np.float32)
         for t in range(1, T):
-            nll[:, t], ev[:, t] = S.frame_stats(frames[:, t], pred[:, t], sigma)
+            nll[:, t], ev[:, t] = S.evidence(*S.gaussian_patches(frames[:, t], pred[:, t], sigma))
         return nll, ev
 
     def twins(self, p):
-        return self._traj(p.law, p.lawful) + self._traj(p.imp, p.impossible)
-
-    def control(self, p):
-        return None
+        return self._traj(p.law, p.lawful) + self._traj(p.imp, p.impossible, truth=p.law)
 
     def null(self, traj, frames):
         return self._traj(traj, frames)
@@ -133,7 +133,7 @@ def null_frames(observer):
     for i in range(0, NULL_CLIPS, 128):
         traj = W.simulate(W.random_scene(rng, 128), NULL_T)
         frames, vis = W.render(traj, rng)
-        m = observer.null(traj, frames)[1] if isinstance(observer, IdealObserver) else observer.score(frames)[1]
+        m = observer.null(traj, frames)[1] if isinstance(observer, ReferenceObserver) else observer.score(frames)[1]
         contact = traj.bounced.any(-1)
         edge = ((vis > 0.02) & (vis < 0.98) & traj.alive).any(-1)
         reveal = np.zeros_like(contact)
@@ -150,8 +150,8 @@ def main():
     ap.add_argument("--families", default=None)
     a = ap.parse_args()
 
-    if a.who in O.KINDS:
-        observer = IdealObserver(a.who)
+    if a.who in ("ideal", *O.KINDS):
+        observer = ReferenceObserver(a.who)
         out = Path(a.out or f"runs/observers/{a.who}")
     else:
         observer = ModelObserver(load_model(a.who))

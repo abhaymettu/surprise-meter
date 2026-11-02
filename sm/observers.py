@@ -1,18 +1,16 @@
-"""Reference observers with oracle perception of every visible ball.
+"""Reference observers, all with the true pixel noise as their likelihood, N(prediction, NOISE^2).
 
-They differ only in what they know:
-  ideal    true physics (walls, ball contacts) and memory for hidden balls: the physics limit
-  cv       constant velocity, no walls, and memory for hidden balls (dead reckoning)
-  cv0      constant velocity, no walls, no memory: a ball out of sight is forgotten
-
-Each predicts the next noiseless frame; its likelihood is the true pixel noise, N(prediction, NOISE^2).
+  ideal    knows the lawful continuation of every clip exactly. This is the signal-known-exactly observer of
+           detection theory, and no observer can separate the twins better
+  cv       sees every visible ball perfectly, assumes constant velocity and no walls, remembers hidden balls
+  cv0      the same, but a ball out of sight is forgotten
 """
 
 import numpy as np
 
 from . import world as W
 
-KINDS = {"ideal": (True, True), "cv": (False, True), "cv0": (False, False)}  # (physics, memory)
+KINDS = {"cv": True, "cv0": False}  # memory for hidden balls
 SEEN = 0.02  # a ball is perceived when at least this fraction of it is visible
 
 
@@ -25,7 +23,7 @@ def render_state(scene, pos, alive):
 
 def predict(traj, vis, kind):
     """Predicted noiseless frames (B, T, H, W); index t is the prediction of frame t made after seeing frame t-1."""
-    physics, memory = KINDS[kind]
+    memory = KINDS[kind]
     sc = traj.scene
     B, T, N = traj.alive.shape
     pos = np.zeros((B, N, 2), np.float32)
@@ -38,24 +36,12 @@ def predict(traj, vis, kind):
         obs = vis[:, t] > SEEN
         p = traj.pos[:, t]
         fd = np.where((prev_obs & obs)[..., None], p - prev_pos, 0)
-        if physics:
-            first = obs & ~known
-            moved = obs & known & (np.abs(p - pos).max(-1) > 1e-3)
-            vel = np.where(first[..., None], traj.vel[:, t], vel)
-            vel = np.where((moved & prev_obs)[..., None], fd, vel)
-            pos = np.where((first | moved)[..., None], p, pos)
-        else:
-            pos = np.where(obs[..., None], p, pos)
-            vel = np.where(obs[..., None], fd, vel)
+        pos = np.where(obs[..., None], p, pos)
+        vel = np.where(obs[..., None], fd, vel)
         known = (known | obs) if memory else obs
         prev_pos = np.where(obs[..., None], p, prev_pos)
         prev_obs = obs
-        if physics:
-            st = {"pos": pos.copy(), "vel": vel.copy(), "rad": sc.rad, "walls": sc.walls.copy(), "alive": known.copy()}
-            W._step(st)
-            pos, vel = st["pos"], st["vel"]
-        else:
-            pos = pos + vel
+        pos = pos + vel
         out[:, t + 1] = render_state(sc, pos, known)
     return out
 

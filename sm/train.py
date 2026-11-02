@@ -23,14 +23,15 @@ from . import world as W
 LR = {"1m": 1e-3, "5m": 7e-4, "20m": 4e-4}
 
 
-def batches(seed, start, B, T):
+def batches(seed, start, B, T, blank_rate):
     """Batch k is a pure function of (seed, k), so a resumed run sees exactly the data it would have."""
     q = queue.Queue(maxsize=4)
 
     def work():
         k = start
         while True:
-            q.put((k, W.train_batch(np.random.default_rng([seed, k]), B, T)))
+            rng = np.random.default_rng([seed, k])
+            q.put((k, W.train_batch(rng, B, T), W.blank_mask(rng, B, T - 1, blank_rate)))
             k += 1
 
     threading.Thread(target=work, daemon=True).start()
@@ -89,6 +90,9 @@ def main():
     ap.add_argument("--eval-every", type=int, default=500)
     ap.add_argument("--arch", default="recurrent", choices=["recurrent", "window"])
     ap.add_argument("--window", type=int, default=32)
+    ap.add_argument("--mix", type=int, default=1)
+    ap.add_argument("--blank", type=float, default=0.0, help="fraction of clips with a stretch of withheld input")
+    ap.add_argument("--no-state-norm", action="store_true")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
@@ -97,7 +101,7 @@ def main():
     if (out / "final.safetensors").exists():
         print(f"{out} already finished")
         return
-    cfg = replace(M.SIZES[a.size], arch=a.arch, window=a.window)
+    cfg = replace(M.SIZES[a.size], arch=a.arch, window=a.window, mix=a.mix, state_norm=not a.no_state_norm)
     lr = a.lr or LR[a.size]
     (out / "config.json").write_text(json.dumps({"model": M.config_dict(cfg), "args": vars(a), "lr": lr}, indent=1))
 
@@ -120,14 +124,14 @@ def main():
     mx.eval(model.parameters())
     print(f"{a.size} seed {a.seed}: {M.count_params(model) / 1e6:.2f}M params, lr {lr}")
 
-    def loss_fn(m, x):
-        return M.frame_nll(m, x).mean() / (W.SIZE * W.SIZE)
+    def loss_fn(m, x, blank):
+        return M.frame_nll(m, x, blank if m.cfg.arch == "recurrent" else None).mean() / (W.SIZE * W.SIZE)
 
     grad_fn = nn.value_and_grad(model, loss_fn)
     state = [model.state, opt.state]
 
-    def step_fn(x):
-        loss, g = grad_fn(model, x)
+    def step_fn(x, blank):
+        loss, g = grad_fn(model, x, blank)
         g, _ = optim.clip_grad_norm(g, 1.0)
         opt.update(model, g)
         return loss
@@ -138,10 +142,10 @@ def main():
     floor = M.noise_floor_nll() / (W.SIZE * W.SIZE)
     log = open(out / "log.jsonl", "a")
     t0, losses = time.time(), []
-    for k, x in batches(a.seed, step, a.batch, a.frames):
+    for k, x, blank in batches(a.seed, step, a.batch, a.frames, a.blank):
         if k >= a.steps:
             break
-        loss = train_step(mx.array(x))
+        loss = train_step(mx.array(x), mx.array(blank))
         mx.eval(state)
         losses.append(float(loss))
         step = k + 1

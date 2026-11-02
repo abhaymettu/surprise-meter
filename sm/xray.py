@@ -31,7 +31,7 @@ def rollout_states(model, frames):
     state = model.initial_state(B)
     out = []
     for t in range(Tf):
-        state, _, _ = model.step(state, p[:, t * M.TOKENS : (t + 1) * M.TOKENS])
+        state = model.step(state, p[:, t * M.TOKENS : (t + 1) * M.TOKENS])[0]
         mx.eval(state)
         out.append(np.array(state[:, : M.TOKENS]))
     return np.stack(out, 1)

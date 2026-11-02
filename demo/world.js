@@ -1,5 +1,5 @@
 // The same 2D world the model was trained on (sm/world.py), one scene at a time, in JS.
-export const SIZE = 32, NOISE = 0.04;
+export const SIZE = 32, NOISE = 0.15;
 
 const uniform = (a, b) => a + Math.random() * (b - a);
 const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());

@@ -1,6 +1,6 @@
 // The world model's forward step, by hand: one WebGPU compute implementation and one CPU implementation of
 // sm/model.py RecurrentModel.step, with no framework. Both take a 32x32 frame and return the Gaussian over the next one.
-const PATCH = 8, GRID = 4, TOKENS = 16, PDIM = 64, NOISE = 0.04, SIGMA_FLOOR = 0.9 * NOISE;
+const PATCH = 8, GRID = 4, TOKENS = 16, PDIM = 64, NOISE = 0.15, SIGMA_FLOOR = 0.9 * NOISE;
 
 export async function loadWeights(url) {
   const [meta, buf] = await Promise.all([fetch(`${url}.json`).then((r) => r.json()), fetch(`${url}.bin`).then((r) => r.arrayBuffer())]);
