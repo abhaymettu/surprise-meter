@@ -9,6 +9,7 @@ Each entry is one run directory: a size, a seed and a training regime. The plan 
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 RUNS = Path("runs")
@@ -20,17 +21,22 @@ def job(size, seed, blank=0.0, name=None):
 
 
 PLAN = [
-    job("5m", 0),
     *[job("1m", s) for s in range(5)],
     job("20m", 0),
-    *[job("5m", s) for s in range(1, 5)],
+    *[job("5m", s) for s in range(5)],
     *[job("20m", s) for s in range(1, 5)],
 ]
 
 
-def run(*cmd):
-    print("$", " ".join(cmd), flush=True)
-    subprocess.run([sys.executable, "-m", *cmd], check=True)
+def run(*cmd, tries=200):
+    """A GPU job can die when the machine is busy. Trainers resume from their last checkpoint, so just run it again."""
+    for attempt in range(tries):
+        print("$", " ".join(cmd), flush=True)
+        if subprocess.run([sys.executable, "-m", *cmd]).returncode == 0:
+            return
+        print(f"attempt {attempt + 1} failed", flush=True)
+        time.sleep(60)
+    raise SystemExit(f"gave up on {cmd}")
 
 
 def main():

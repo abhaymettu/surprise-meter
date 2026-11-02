@@ -91,11 +91,14 @@ def main():
     ap.add_argument("--arch", default="recurrent", choices=["recurrent", "window"])
     ap.add_argument("--window", type=int, default=32)
     ap.add_argument("--mix", type=int, default=1)
+    ap.add_argument("--crossing", type=float, default=None, help="override world.CROSSING for an experiment")
     ap.add_argument("--blank", type=float, default=0.0, help="fraction of clips with a stretch of withheld input")
     ap.add_argument("--no-state-norm", action="store_true")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
+    if a.crossing is not None:
+        W.CROSSING = a.crossing
     out = Path(a.out or f"runs/{a.size}-s{a.seed}")
     out.mkdir(parents=True, exist_ok=True)
     if (out / "final.safetensors").exists():
