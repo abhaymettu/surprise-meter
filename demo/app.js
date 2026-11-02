@@ -382,7 +382,9 @@ function drawMeter(now, f) {
     c.lineWidth = dpr;
     c.beginPath(); c.moveTo(0, yy); c.lineTo(W, yy); c.stroke();
     c.fillStyle = "#6c727a";
-    c.fillText(label, pad, yy - 2 * dpr);
+    const isTop = l === LOG_TOP;
+    c.textBaseline = isTop ? "top" : "bottom";
+    c.fillText(label, pad, yy + (isTop ? 2 : -2) * dpr);
   }
 
   const N = trace.length, step = W / (N - 1);
