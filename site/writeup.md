@@ -10,7 +10,7 @@ The sharpest test is a deletion. A ball goes behind a slab and never comes out. 
 
 ## How long it holds on depends on how you ask
 
-Scored until the lawful ball is 3 px out of the slab, the model stops favouring the lawful twin after about 9 frames hidden. That number mixes memory with speed, since only slow balls stay hidden long. Balls under 0.4 px per frame fail even at 4 frames, and faster ones still win at 12.
+Scored until the lawful ball is 3 px out of the slab, the model stops favoring the lawful twin after about 9 frames hidden. That number mixes memory with speed, since only slow balls stay hidden long. Balls under 0.4 px per frame fail even at 4 frames, and balls over 0.6 still win at 12.
 
 It also depends on the scoring. Over a window of frames each twin is judged by its own state, and the impossible twin's state has already seen empty frames. On the first frame where the twins differ, both are judged from one state, and there the model stays above chance to about 25 frames, with a wide interval. That single frame carries little signal. An observer told the exact lawful frame gets 0.66 at 4 frames hidden and 0.50 by 28, and the model runs a little below it the whole way.
 
@@ -30,7 +30,7 @@ On visible events the model is far from efficient. Its thresholds at 75% correct
 
 ## The demo
 
-The model runs in your browser on WebGPU and guesses every frame before it sees it. A meter shows how strange each frame was, as a rate on held-out lawful frames: "1 in 9,300" means that share of ordinary frames look at least this strange. Drag a ball to break the physics and the meter jumps. The outline of a hidden ball is read straight out of the model's state.
+The model runs in your browser on WebGPU and guesses every frame before it sees it. A meter shows how strange each frame was, as a rate on held-out lawful frames: "1 in 9,300" means one ordinary frame in 9,300 looks at least this strange. Drag a ball to break the physics and the meter jumps. The outline of a hidden ball is read straight out of the model's state.
 
 ## What did not hold
 

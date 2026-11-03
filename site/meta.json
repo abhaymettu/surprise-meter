@@ -1,7 +1,7 @@
 {
   "kind": "project",
   "title": "surprise-meter",
-  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with an ideal observer as the yardstick. That yardstick showed a probe that seemed to see more than the model was only drawing too bright.",
+  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with an ideal observer as the yardstick. That yardstick caught a probe that seemed to see more than the model and was only drawing the ball too bright.",
   "summary": "Lets anyone watch a world model guess each frame in the browser, break its physics with a finger, and see how surprised it is.",
   "repo": "https://github.com/abhaymettu/surprise-meter",
   "hero_image": {

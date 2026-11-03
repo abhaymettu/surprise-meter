@@ -22,7 +22,7 @@ I compared the head with five readers that turn the same frozen state into a pic
 
 | Hidden frames where the lawful twin stops winning, 3 px window | Straight crossing | Hidden bounce |
 |---|---|---|
-| The model's head, with its own variance | 8.9 [7.4, 10.1] | 9.3 [below 4, 10.7] |
+| The model's head, with its own variance | 8.9 [7.4, 10.1] | 9.3 [below 6, 10.7] |
 | The head's mean, at the world's noise | 10.0 [8.7, 11.1] | 12.5 [10.1, 16.9] |
 | Ridge to the next frame | 9.9 [8.3, 11.1] | 12.9 [10.3, 16.9] |
 | Ridge to visible pixels, drawn through slabs | 12.4 [10.8, 14.3] | 18.9 [16.4, 21.1] |
