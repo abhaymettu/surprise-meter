@@ -596,7 +596,7 @@ async function attractLoop() {
     if (!attract) break;
     await wait(2400);
     if (!attract) break;
-    caption("Nothing comes out. With no ball to confirm it, the outline fades within about half a second.", 0);
+    caption("Nothing came out. With no ball to confirm it, the outline faded within about a second.", 0);
     await wait(2800);
     if (!attract) break;
     newWorld({ balls: 2, occluders: 1 });
