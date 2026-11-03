@@ -7,7 +7,7 @@ Written by `python -m sm.figures` from `results/summary.json`. Brackets are 95% 
 | size | seeds |
 |---|---|
 | 1M | 1m-s0, 1m-s1, 1m-s2, 1m-s3 |
-| 5M | 5m-s1, 5m-s2 |
+| 5M | 5m-s1, 5m-s2, 5m-s3, 5m-s4 |
 | 20M | 20m-s0 |
 | 1M, 8-frame window | 1m-window8-s0 |
 | 1M, 60000 steps | 1m-long-s0 |
@@ -18,29 +18,29 @@ Written by `python -m sm.figures` from `results/summary.json`. Brackets are 95% 
 | family | unit | told the state | causal ideal | dead reckoning with walls | wall-blind | no memory | 1M | 5M | 20M |
 |---|---|---|---|---|---|---|---|---|---|
 | teleport | px | 0.04 | 0.065 | 0.068 | 0.068 | 0.068 | 0.16 [0.13, 0.18] | 0.14 [0.12, 0.16] | 0.14 [0.12, 0.15] |
-| deflect | deg | 0.44 | 0.63 | 7.1 | 7.1 | 7.1 | 5.6 [4.8, 6.6] | 3.4 [3, 3.9] | 3.5 [2.9, 4.2] |
-| phantom | px | 0.022 | 0.032 | 0.27 | 4.5 | 4.5 | 0.095 [0.072, 0.12] | 0.093 [0.065, 0.1] | 0.099 [0.097, 0.1] |
-| collision | restitution error | 0.0092 | 0.011 | not reached | not reached | not reached | 1.2 [1.2, 1.3] | 0.74 [0.67, 0.81] | 0.57 [0.51, 0.61] |
-| hidden | px | below 0.05 | below 0.05 | 1.5 | 1.9 | not reached | 2.3 [1.9, not reached] | 1.1 [0.91, 1.4] | 1.3 [1.1, 1.9] |
+| deflect | deg | 0.44 | 0.63 | 7.1 | 7.1 | 7.1 | 5.6 [4.7, 6.7] | 3.6 [3.1, 4] | 3.5 [2.9, 4.3] |
+| phantom | px | 0.022 | 0.032 | 0.27 | 4.5 | 4.5 | 0.095 [0.072, 0.12] | 0.095 [0.077, 0.099] | 0.099 [0.098, 0.1] |
+| collision | restitution error | 0.0092 | 0.011 | not reached | not reached | not reached | 1.2 [1.1, 1.3] | 0.71 [0.64, 0.77] | 0.57 [0.51, 0.61] |
+| hidden | px | below 0.05 | below 0.05 | 1.5 | 1.9 | not reached | 2.3 [1.9, not reached] | 1.1 [0.91, 1.3] | 1.3 [1.1, 1.9] |
 
 ## Efficiency against the causal ideal: (its threshold / the model's) squared
 
 | family | 1M | 5M | 20M |
 |---|---|---|---|
-| teleport | 0.169 [0.135, 0.229] | 0.216 [0.168, 0.31] | 0.227 [0.182, 0.311] |
-| deflect | 0.0127 [0.00898, 0.0174] | 0.0335 [0.0255, 0.0448] | 0.0319 [0.0226, 0.0472] |
-| phantom | 0.117 [0.076, 0.203] | 0.122 [0.104, 0.248] | 0.106 [0.102, 0.111] |
-| collision | 8.41e-05 [7.24e-05, 9.6e-05] | 0.000237 [0.000196, 0.000288] | 0.000396 [0.00034, 0.000492] |
+| teleport | 0.169 [0.135, 0.229] | 0.221 [0.168, 0.313] | 0.227 [0.183, 0.313] |
+| deflect | 0.0127 [0.00889, 0.0176] | 0.0302 [0.0249, 0.0422] | 0.0319 [0.0216, 0.0474] |
+| phantom | 0.117 [0.0783, 0.202] | 0.117 [0.107, 0.179] | 0.106 [0.102, 0.11] |
+| collision | 8.41e-05 [7.18e-05, 9.8e-05] | 0.000254 [0.000216, 0.000314] | 0.000396 [0.000345, 0.000491] |
 | hidden | not reached | not reached | not reached |
 
 ## Efficiency against the observer told the exact state
 
 | family | 1M | 5M | 20M |
 |---|---|---|---|
-| teleport | 0.0664 [0.053, 0.0899] | 0.0847 [0.0658, 0.121] | 0.089 [0.0712, 0.122] |
-| deflect | 0.00627 [0.00443, 0.0086] | 0.0166 [0.0126, 0.0221] | 0.0157 [0.0112, 0.0233] |
-| phantom | 0.0516 [0.0335, 0.0896] | 0.0536 [0.046, 0.109] | 0.0469 [0.0451, 0.0488] |
-| collision | 5.56e-05 [4.78e-05, 6.35e-05] | 0.000157 [0.000129, 0.00019] | 0.000262 [0.000225, 0.000326] |
+| teleport | 0.0664 [0.053, 0.0899] | 0.0866 [0.0659, 0.123] | 0.089 [0.0718, 0.123] |
+| deflect | 0.00627 [0.00439, 0.0087] | 0.0149 [0.0123, 0.0208] | 0.0157 [0.0107, 0.0234] |
+| phantom | 0.0516 [0.0345, 0.0889] | 0.0515 [0.047, 0.079] | 0.0469 [0.0451, 0.0487] |
+| collision | 5.56e-05 [4.74e-05, 6.48e-05] | 0.000168 [0.000142, 0.000208] | 0.000262 [0.000228, 0.000325] |
 | hidden | not reached | not reached | not reached |
 
 ## Yes/no detection: magnitude detected half the time above false alarms, at one lawful frame in a thousand
@@ -57,12 +57,12 @@ Written by `python -m sm.figures` from `results/summary.json`. Brackets are 95% 
 
 | family | measure | 1M | 5M | 20M | 1M, 8-frame window | 1M, 60000 steps | 5M, 10000 steps |
 |---|---|---|---|---|---|---|---|
-| vanish | 3 px of the reveal | 2.6 [2.3, 2.9] | 8.9 [7.3, 10.0] | 9.8 [9.2, 10.3] | below 1 | 9.4 [8.5, 10.3] | 2.9 [2.7, 3.1] |
-| vanish | full emergence | below 1 | 3.1 [2.8, 3.4] | 3.5 [3.2, 3.9] | below 1 | 3.9 [3.5, 4.5] | below 1 |
-| vanish | trace halves, per frame | 3.9 [3.6, 5.4] | 4.0 [3.5, 5.9] | 4.2 [3.5, 6.7] | 3.0 [2.5, 3.5] | 4.0 [3.6, 6.4] | 3.9 [3.6, 4.9] |
-| rebound | 3 px of the reveal | below 6 | 9.3 [below 6, 10.7] | 10.6 [9.3, 12.1] | below 6 | 11.4 [10.6, 12.6] | below 6 |
+| vanish | 3 px of the reveal | 2.6 [2.3, 2.9] | 8.8 [7.6, 9.8] | 9.8 [9.3, 10.4] | below 1 | 9.4 [8.4, 10.2] | 2.9 [2.7, 3.1] |
+| vanish | full emergence | below 1 | 3.1 [2.8, 3.5] | 3.5 [3.2, 3.9] | below 1 | 3.9 [3.5, 4.5] | below 1 |
+| vanish | trace halves, per frame | 3.9 [3.7, 5.5] | 4.2 [3.6, 6.1] | 4.2 [3.5, 6.6] | 3.0 [2.5, 3.5] | 4.0 [3.6, 6.3] | 3.9 [3.6, 5.0] |
+| rebound | 3 px of the reveal | below 6 | 9.1 [6.8, 10.3] | 10.6 [9.4, 12.1] | below 6 | 11.4 [10.6, 12.7] | below 6 |
 | rebound | full emergence | below 6 | below 6 | below 6 | below 6 | below 6 | below 6 |
-| rebound | trace halves, per frame | 17.9 [16.0, 19.5] | 25.3 [21.8, 28.4] | 20.9 [18.4, 23.7] | 7.7 [7.4, 9.5] | 17.1 [14.8, 18.7] | 17.9 [15.6, 18.9] |
+| rebound | trace halves, per frame | 17.9 [15.6, 19.5] | 22.6 [19.5, 26.1] | 20.9 [18.4, 23.8] | 7.7 [7.4, 9.5] | 17.1 [15.0, 18.8] | 17.9 [15.6, 18.8] |
 
 The same crossing for the observers, which have no learned state:
 
@@ -77,46 +77,46 @@ The same crossing for the observers, which have no learned state:
 
 | family | scored by | 1M | 5M | 20M |
 |---|---|---|---|---|
-| vanish | head, 3 px | below 4 | 8.9 [7.3, 10.1] | 9.8 [9.2, 10.3] |
+| vanish | head, 3 px | below 4 | 8.8 [7.5, 9.7] | 9.8 [9.2, 10.3] |
 | vanish | head, full | below 4 | below 4 | below 4 |
-| vanish | head's mean at the world's noise, 3 px | below 4 | 10.0 [8.5, 11.3] | 11.2 [10.4, 12.3] |
-| vanish | head's mean at the world's noise, full | below 4 | 4.3 [below 4, 6.0] | 5.4 [4.6, 6.4] |
-| vanish | ridge to the next frame, 3 px | below 4 | 9.9 [8.2, 11.2] | 10.5 [9.8, 11.3] |
-| vanish | ridge to the next frame, full | below 4 | 4.5 [below 4, 6.2] | 5.2 [4.4, 6.1] |
-| vanish | ridge to visible pixels, through decoded slabs, 3 px | below 4 | 12.4 [10.8, 14.4] | 13.0 [11.9, 13.6] |
-| vanish | ridge to visible pixels, through decoded slabs, full | below 4 | 10.2 [8.8, 12.6] | 8.8 [7.8, 9.5] |
-| vanish | linear read through decoded slabs, 3 px | 4.9 [below 4, 6.2] | 21.1 [15.7, 26.0] | 19.5 [18.4, 20.9] |
-| vanish | linear read through decoded slabs, full | below 4 | 21.8 [18.5, 24.4] | 16.0 [14.7, 17.0] |
-| vanish | head's mean minus head, 3 px | +0.0 [+0.0, +0.0] | +1.1 [+0.6, +1.7] | +1.4 [+0.7, +2.4] |
-| vanish | head's mean minus head, full | +0.0 [+0.0, +0.0] | +4.3 [+0.0, +6.0] | +5.4 [+4.3, +6.4] |
-| vanish | ridge to the next frame minus head, 3 px | +0.0 [+0.0, +0.0] | +1.0 [+0.4, +1.6] | +0.7 [+0.2, +1.4] |
-| vanish | ridge to the next frame minus head, full | +0.0 [+0.0, +0.0] | +4.5 [+0.0, +6.2] | +5.2 [+4.2, +6.1] |
-| vanish | ridge to visible pixels minus ridge to the next frame, 3 px | +0.0 [+0.0, +0.0] | +2.5 [+1.7, +3.9] | +2.5 [+1.5, +3.2] |
-| vanish | ridge to visible pixels minus ridge to the next frame, full | +0.0 [+0.0, +0.0] | +5.7 [+4.0, +10.9] | +3.6 [+2.4, +4.6] |
-| vanish | linear read minus ridge to visible pixels, 3 px | +4.9 [+0.0, +6.2] | +8.8 [+3.9, +12.7] | +6.5 [+5.3, +8.1] |
-| vanish | linear read minus ridge to visible pixels, full | +0.0 [+0.0, +0.0] | +11.6 [+9.0, +13.4] | +7.2 [+5.8, +8.4] |
-| vanish | linear read minus head, 3 px | +4.9 [+0.0, +6.2] | +12.2 [+7.5, +16.2] | +9.7 [+8.5, +11.1] |
-| vanish | linear read minus head, full | +0.0 [+0.0, +0.0] | +21.8 [+18.5, +24.4] | +16.0 [+14.5, +17.0] |
-| rebound | head, 3 px | below 4 | 9.3 [below 4, 11.1] | 10.6 [9.5, 12.3] |
-| rebound | head, full | below 4 | below 4 | below 4 |
-| rebound | head's mean at the world's noise, 3 px | below 4 | 12.5 [9.8, 16.8] | 12.8 [11.7, 13.8] |
-| rebound | head's mean at the world's noise, full | below 4 | below 4 | below 4 |
-| rebound | ridge to the next frame, 3 px | below 4 | 12.9 [10.1, 16.8] | 12.3 [11.2, 13.4] |
-| rebound | ridge to the next frame, full | below 4 | below 4 | below 4 |
-| rebound | ridge to visible pixels, through decoded slabs, 3 px | below 4 | 18.9 [16.6, 21.1] | 14.2 [11.7, 16.7] |
-| rebound | ridge to visible pixels, through decoded slabs, full | below 4 | below 4 [below 4, 7.6] | below 4 |
-| rebound | linear read through decoded slabs, 3 px | below 4 | 26.2 [22.4, 30.8] | 22.6 [21.7, 23.8] |
-| rebound | linear read through decoded slabs, full | below 4 | 26.5 [23.3, 33.5] | 20.2 [17.3, 21.2] |
-| rebound | head's mean minus head, 3 px | +0.0 [+0.0, +0.0] | +3.3 [+1.1, +15.5] | +2.3 [+1.1, +3.3] |
+| vanish | head's mean at the world's noise, 3 px | below 4 | 9.8 [8.6, 10.9] | 11.2 [10.4, 12.2] |
+| vanish | head's mean at the world's noise, full | below 4 | 4.6 [below 4, 6.0] | 5.4 [4.6, 6.4] |
+| vanish | ridge to the next frame, 3 px | below 4 | 9.8 [8.5, 10.8] | 10.5 [9.9, 11.3] |
+| vanish | ridge to the next frame, full | below 4 | 4.8 [below 4, 6.1] | 5.2 [4.5, 6.1] |
+| vanish | ridge to visible pixels, through decoded slabs, 3 px | below 4 | 12.4 [11.0, 13.6] | 13.0 [11.9, 13.7] |
+| vanish | ridge to visible pixels, through decoded slabs, full | below 4 | 10.0 [8.2, 11.5] | 8.8 [7.9, 9.6] |
+| vanish | linear read through decoded slabs, 3 px | 4.9 [below 4, 6.4] | 22.1 [18.6, 25.2] | 19.5 [18.4, 20.8] |
+| vanish | linear read through decoded slabs, full | below 4 | 23.4 [20.8, 25.5] | 16.0 [14.6, 17.0] |
+| vanish | head's mean minus head, 3 px | +0.0 [+0.0, +0.0] | +1.0 [+0.6, +1.6] | +1.4 [+0.8, +2.4] |
+| vanish | head's mean minus head, full | +0.0 [+0.0, +0.0] | +4.6 [+0.0, +6.0] | +5.4 [+4.3, +6.4] |
+| vanish | ridge to the next frame minus head, 3 px | +0.0 [+0.0, +0.0] | +1.0 [+0.6, +1.6] | +0.7 [+0.2, +1.4] |
+| vanish | ridge to the next frame minus head, full | +0.0 [+0.0, +0.0] | +4.8 [+0.0, +6.1] | +5.2 [+4.2, +6.1] |
+| vanish | ridge to visible pixels minus ridge to the next frame, 3 px | +0.0 [+0.0, +0.0] | +2.7 [+1.6, +3.8] | +2.5 [+1.5, +3.3] |
+| vanish | ridge to visible pixels minus ridge to the next frame, full | +0.0 [+0.0, +0.0] | +5.2 [+3.6, +10.2] | +3.6 [+2.4, +4.6] |
+| vanish | linear read minus ridge to visible pixels, 3 px | +4.9 [+0.0, +6.4] | +9.7 [+6.2, +13.1] | +6.5 [+5.2, +8.0] |
+| vanish | linear read minus ridge to visible pixels, full | +0.0 [+0.0, +0.0] | +13.4 [+10.8, +16.1] | +7.2 [+5.8, +8.4] |
+| vanish | linear read minus head, 3 px | +4.9 [+0.0, +6.4] | +13.4 [+9.9, +16.6] | +9.7 [+8.5, +11.1] |
+| vanish | linear read minus head, full | +0.0 [+0.0, +0.0] | +23.4 [+20.8, +25.5] | +16.0 [+14.4, +17.0] |
+| rebound | head, 3 px | below 6 | 9.1 [below 6, 10.7] | 10.6 [9.6, 12.2] |
+| rebound | head, full | below 6 | below 6 | below 6 |
+| rebound | head's mean at the world's noise, 3 px | below 6 | 11.8 [10.3, 15.7] | 12.8 [11.6, 13.9] |
+| rebound | head's mean at the world's noise, full | below 6 | below 6 | below 6 |
+| rebound | ridge to the next frame, 3 px | below 6 | 12.1 [10.4, 16.0] | 12.3 [11.2, 13.4] |
+| rebound | ridge to the next frame, full | below 6 | below 6 | below 6 |
+| rebound | ridge to visible pixels, through decoded slabs, 3 px | below 6 | 17.5 [11.8, 20.6] | 14.2 [11.7, 16.5] |
+| rebound | ridge to visible pixels, through decoded slabs, full | below 6 | 6.8 [below 6, 16.6] | below 6 |
+| rebound | linear read through decoded slabs, 3 px | below 6 | 27.1 [23.8, 29.6] | 22.6 [21.7, 23.9] |
+| rebound | linear read through decoded slabs, full | below 6 | 28.8 [25.3, 33.2] | 20.2 [18.0, 21.2] |
+| rebound | head's mean minus head, 3 px | +0.0 [+0.0, +0.0] | +2.7 [+1.5, +11.2] | +2.3 [+1.1, +3.4] |
 | rebound | head's mean minus head, full | +0.0 [+0.0, +0.0] | +0.0 [+0.0, +0.0] | +0.0 [+0.0, +0.0] |
-| rebound | ridge to the next frame minus head, 3 px | +0.0 [+0.0, +0.0] | +3.6 [+1.3, +16.0] | +1.7 [+0.7, +2.8] |
+| rebound | ridge to the next frame minus head, 3 px | +0.0 [+0.0, +0.0] | +3.0 [+1.7, +11.4] | +1.7 [+0.7, +2.7] |
 | rebound | ridge to the next frame minus head, full | +0.0 [+0.0, +0.0] | +0.0 [+0.0, +0.0] | +0.0 [+0.0, +0.0] |
-| rebound | ridge to visible pixels minus ridge to the next frame, 3 px | +0.0 [+0.0, +0.0] | +6.0 [+2.8, +9.0] | +1.9 [-0.2, +4.6] |
-| rebound | ridge to visible pixels minus ridge to the next frame, full | +0.0 [+0.0, +0.0] | +0.0 [+0.0, +7.6] | +0.0 [+0.0, +0.0] |
-| rebound | linear read minus ridge to visible pixels, 3 px | +0.0 [+0.0, +0.0] | +7.3 [+4.0, +11.9] | +8.4 [+5.9, +11.1] |
-| rebound | linear read minus ridge to visible pixels, full | +0.0 [+0.0, +0.0] | +26.5 [+18.4, +33.5] | +20.2 [+16.4, +21.2] |
-| rebound | linear read minus head, 3 px | +0.0 [+0.0, +0.0] | +17.0 [+13.1, +30.3] | +12.0 [+10.2, +13.6] |
-| rebound | linear read minus head, full | +0.0 [+0.0, +0.0] | +26.5 [+23.3, +33.5] | +20.2 [+17.3, +21.2] |
+| rebound | ridge to visible pixels minus ridge to the next frame, 3 px | +0.0 [+0.0, +0.0] | +5.5 [+0.6, +8.0] | +1.9 [-0.2, +4.4] |
+| rebound | ridge to visible pixels minus ridge to the next frame, full | +0.0 [+0.0, +0.0] | +6.8 [+0.0, +16.6] | +0.0 [+0.0, +0.0] |
+| rebound | linear read minus ridge to visible pixels, 3 px | +0.0 [+0.0, +0.0] | +9.6 [+5.9, +16.0] | +8.4 [+6.0, +11.1] |
+| rebound | linear read minus ridge to visible pixels, full | +0.0 [+0.0, +0.0] | +22.0 [+13.8, +32.0] | +20.2 [+18.0, +21.2] |
+| rebound | linear read minus head, 3 px | +0.0 [+0.0, +0.0] | +18.1 [+14.9, +26.8] | +12.0 [+10.1, +13.6] |
+| rebound | linear read minus head, full | +0.0 [+0.0, +0.0] | +28.8 [+25.3, +33.2] | +20.2 [+18.0, +21.2] |
 
 ## Taking directions out of the state while hidden: the head's 2AFC
 
@@ -125,18 +125,18 @@ The same crossing for the observers, which have no learned state:
 | vanish | 1M | 8 | 0.111 | 0.009 | 0.056 | 0.016 | 0.018 |
 | vanish | 1M | 16 | 0.000 | 0.000 | 0.001 | 0.000 | 0.000 |
 | vanish | 1M | 24 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| vanish | 5M | 8 | 0.562 | 0.065 | 0.474 | 0.062 | 0.294 |
-| vanish | 5M | 16 | 0.112 | 0.000 | 0.055 | 0.000 | 0.021 |
-| vanish | 5M | 24 | 0.013 | 0.000 | 0.005 | 0.000 | 0.000 |
+| vanish | 5M | 8 | 0.551 | 0.085 | 0.470 | 0.062 | 0.249 |
+| vanish | 5M | 16 | 0.116 | 0.001 | 0.074 | 0.001 | 0.020 |
+| vanish | 5M | 24 | 0.017 | 0.000 | 0.010 | 0.000 | 0.000 |
 | vanish | 20M | 8 | 0.661 | 0.307 | 0.505 | 0.240 | 0.266 |
 | vanish | 20M | 16 | 0.146 | 0.021 | 0.073 | 0.010 | 0.010 |
 | vanish | 20M | 24 | 0.016 | 0.000 | 0.010 | 0.000 | 0.000 |
 | rebound | 1M | 8 | 0.089 | 0.000 | 0.052 | 0.004 | 0.013 |
 | rebound | 1M | 16 | 0.031 | 0.000 | 0.004 | 0.000 | 0.000 |
 | rebound | 1M | 24 | 0.001 | 0.000 | 0.000 | 0.000 | 0.000 |
-| rebound | 5M | 8 | 0.544 | 0.042 | 0.406 | 0.039 | 0.195 |
-| rebound | 5M | 16 | 0.336 | 0.008 | 0.214 | 0.005 | 0.044 |
-| rebound | 5M | 24 | 0.068 | 0.000 | 0.029 | 0.000 | 0.008 |
+| rebound | 5M | 8 | 0.543 | 0.044 | 0.435 | 0.033 | 0.148 |
+| rebound | 5M | 16 | 0.312 | 0.007 | 0.225 | 0.005 | 0.035 |
+| rebound | 5M | 24 | 0.069 | 0.000 | 0.040 | 0.000 | 0.005 |
 | rebound | 20M | 8 | 0.615 | 0.255 | 0.505 | 0.151 | 0.224 |
 | rebound | 20M | 16 | 0.260 | 0.031 | 0.130 | 0.016 | 0.016 |
 | rebound | 20M | 24 | 0.078 | 0.005 | 0.021 | 0.000 | 0.000 |
@@ -151,8 +151,8 @@ Share of the state's variance on hidden frames that those directions carry:
 | 1M | random | 16 | 0.138 |
 | 5M | read | 4 | 0.003 |
 | 5M | read | 16 | 0.006 |
-| 5M | random | 4 | 0.010 |
-| 5M | random | 16 | 0.049 |
+| 5M | random | 4 | 0.013 |
+| 5M | random | 16 | 0.054 |
 | 20M | read | 4 | 0.002 |
 | 20M | read | 16 | 0.004 |
 | 20M | random | 4 | 0.006 |
@@ -164,32 +164,32 @@ Share of the state's variance on hidden frames that those directions carry:
 
 | D | 1M | 5M | 20M | last seen | straight line | slab middle |
 |---|---|---|---|---|---|---|
-| 4 | 2.19 | 1.54 | 1.51 | 3.16 | 0.00 | 1.62 |
-| 6 | 2.33 | 1.55 | 1.65 | 4.24 | 0.00 | 2.26 |
-| 8 | 2.58 | 1.56 | 1.47 | 5.55 | 0.00 | 2.76 |
-| 12 | 2.45 | 1.53 | 1.35 | 5.90 | 0.00 | 3.01 |
-| 16 | 2.61 | 1.75 | 1.60 | 6.59 | 0.00 | 3.36 |
-| 20 | 2.77 | 1.84 | 1.60 | 6.76 | 0.00 | 3.34 |
-| 24 | 2.81 | 1.90 | 1.77 | 6.92 | 0.00 | 3.46 |
-| 28 | 3.39 | 1.91 | 1.79 | 7.01 | 0.00 | 3.59 |
-| 32 | 3.80 | 2.16 | 1.96 | 7.52 | 0.00 | 3.82 |
-| 40 | 4.58 | 2.64 | 2.45 | 7.82 | 0.00 | 3.99 |
-| 48 | 4.93 | 2.97 | 3.17 | 8.27 | 0.00 | 4.28 |
+| 4 | 2.19 | 1.51 | 1.51 | 3.16 | 0.00 | 1.62 |
+| 6 | 2.33 | 1.51 | 1.65 | 4.24 | 0.00 | 2.26 |
+| 8 | 2.58 | 1.53 | 1.47 | 5.55 | 0.00 | 2.76 |
+| 12 | 2.45 | 1.50 | 1.35 | 5.90 | 0.00 | 3.01 |
+| 16 | 2.61 | 1.63 | 1.60 | 6.59 | 0.00 | 3.36 |
+| 20 | 2.77 | 1.71 | 1.60 | 6.76 | 0.00 | 3.34 |
+| 24 | 2.81 | 1.80 | 1.77 | 6.92 | 0.00 | 3.46 |
+| 28 | 3.39 | 1.78 | 1.79 | 7.01 | 0.00 | 3.59 |
+| 32 | 3.80 | 1.98 | 1.96 | 7.52 | 0.00 | 3.82 |
+| 40 | 4.58 | 2.41 | 2.45 | 7.82 | 0.00 | 3.99 |
+| 48 | 4.93 | 2.73 | 3.17 | 8.27 | 0.00 | 4.28 |
 
 ### rebound, read 75% of the way through
 
 | D | 1M | 5M | 20M | last seen | straight line | slab middle |
 |---|---|---|---|---|---|---|
-| 6 | 1.39 | 1.26 | 1.09 | 1.07 | 2.07 | 0.41 |
-| 8 | 1.32 | 1.06 | 0.96 | 1.08 | 3.24 | 0.46 |
-| 12 | 1.43 | 1.23 | 1.15 | 1.74 | 4.66 | 0.66 |
-| 16 | 1.40 | 1.19 | 1.25 | 2.46 | 5.73 | 0.71 |
-| 20 | 1.34 | 1.12 | 1.22 | 2.79 | 6.10 | 0.79 |
-| 24 | 1.50 | 1.25 | 1.30 | 3.41 | 7.13 | 0.82 |
-| 28 | 1.54 | 1.27 | 1.32 | 3.83 | 7.80 | 0.96 |
-| 32 | 1.60 | 1.19 | 1.33 | 4.06 | 8.03 | 0.85 |
-| 40 | 1.84 | 1.36 | 1.38 | 4.33 | 8.02 | 0.90 |
-| 48 | 2.31 | 1.53 | 1.32 | 3.29 | 6.65 | 0.84 |
+| 6 | 1.39 | 1.22 | 1.09 | 1.07 | 2.07 | 0.41 |
+| 8 | 1.32 | 0.99 | 0.96 | 1.08 | 3.24 | 0.46 |
+| 12 | 1.43 | 1.16 | 1.15 | 1.74 | 4.66 | 0.66 |
+| 16 | 1.40 | 1.09 | 1.25 | 2.46 | 5.73 | 0.71 |
+| 20 | 1.34 | 1.10 | 1.22 | 2.79 | 6.10 | 0.79 |
+| 24 | 1.50 | 1.26 | 1.30 | 3.41 | 7.13 | 0.82 |
+| 28 | 1.54 | 1.21 | 1.32 | 3.83 | 7.80 | 0.96 |
+| 32 | 1.60 | 1.21 | 1.33 | 4.06 | 8.03 | 0.85 |
+| 40 | 1.84 | 1.29 | 1.38 | 4.33 | 8.02 | 0.90 |
+| 48 | 2.31 | 1.45 | 1.32 | 3.29 | 6.65 | 0.84 |
 
 ## Following the unseen bounce: motion along x, read against truth
 
@@ -199,10 +199,10 @@ Share of the state's variance on hidden frames that those directions carry:
 | 1M | 16 | return | 0.96 | 0.70 |
 | 1M | 28 | outward | 0.95 | 0.73 |
 | 1M | 28 | return | 0.98 | 0.60 |
-| 5M | 16 | outward | 0.97 | 0.91 |
-| 5M | 16 | return | 0.99 | 0.96 |
-| 5M | 28 | outward | 1.00 | 0.84 |
-| 5M | 28 | return | 0.99 | 0.85 |
+| 5M | 16 | outward | 0.98 | 0.90 |
+| 5M | 16 | return | 0.99 | 0.98 |
+| 5M | 28 | outward | 1.00 | 0.86 |
+| 5M | 28 | return | 0.99 | 0.86 |
 | 20M | 16 | outward | 0.98 | 0.90 |
 | 20M | 16 | return | 0.99 | 1.02 |
 | 20M | 28 | outward | 0.99 | 0.86 |
@@ -220,15 +220,15 @@ Share of the state's variance on hidden frames that those directions carry:
 | band, px per frame | 1M | 5M | 20M |
 |---|---|---|---|
 | 0.15 to 0.4 | below 4 | below 4 | below 4 |
-| 0.4 to 0.6 | below 4 | 9.5 | 10.9 |
-| 0.6 to 1.3 | 3.1 | past 12 | 11.5 |
+| 0.4 to 0.6 | below 4 | 9.6 | 10.9 |
+| 0.6 to 1.3 | 3.1 | 11.4 | 11.5 |
 
 ## Restitution where the model's likelihood peaks (the world's is 1)
 
 | size | restitution | by seed |
 |---|---|---|
 | 1M | 0.47 | 0.47, 0.44, 0.52, 0.44 |
-| 5M | 0.74 | 0.74, 0.74 |
+| 5M | 0.75 | 0.74, 0.74, 0.79, 0.72 |
 | 20M | 0.84 | 0.84 |
 
 ## A ball passing through a wall: pairs favouring the lawful twin
@@ -244,7 +244,7 @@ Share of the state's variance on hidden frames that those directions carry:
 | size | all | quiet | edge | contact | reveal |
 |---|---|---|---|---|---|
 | 1M | 0.00087 | 0.00045 | 0.00161 | 0.00086 | 0.00127 |
-| 5M | 0.00093 | 0.00063 | 0.00144 | 0.00107 | 0.00147 |
+| 5M | 0.00094 | 0.00063 | 0.00147 | 0.00098 | 0.00147 |
 | 20M | 0.00092 | 0.00063 | 0.00141 | 0.00107 | 0.00160 |
 
 ## The same, by time since the start of a clip (training clips are 64 frames)
@@ -252,6 +252,6 @@ Share of the state's variance on hidden frames that those directions carry:
 | size | 4-96 | 96-200 | 200-400 | 400-800 | 800-1200 |
 |---|---|---|---|---|---|
 | 1M | 0.00111 | 0.00092 | 0.00097 | 0.00090 | 0.00088 |
-| 5M | 0.00098 | 0.00067 | 0.00087 | 0.00085 | 0.00079 |
+| 5M | 0.00102 | 0.00066 | 0.00088 | 0.00087 | 0.00078 |
 | 20M | 0.00093 | 0.00073 | 0.00091 | 0.00085 | 0.00080 |
 

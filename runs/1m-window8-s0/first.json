@@ -1,0 +1,194 @@
+{
+ "decisions": [
+  {
+   "family": "vanish",
+   "D": 4,
+   "mean_gain": 0.019095540046691895,
+   "mean_cos": 0.023173430934548378,
+   "head_first": 0.23958333333333334,
+   "mean_first": 0.24479166666666666,
+   "ideal_first": 0.6614583333333334
+  },
+  {
+   "family": "vanish",
+   "D": 6,
+   "mean_gain": 0.026700899004936218,
+   "mean_cos": 0.040227849036455154,
+   "head_first": 0.3072916666666667,
+   "mean_first": 0.3072916666666667,
+   "ideal_first": 0.7135416666666666
+  },
+  {
+   "family": "vanish",
+   "D": 8,
+   "mean_gain": 0.026302902027964592,
+   "mean_cos": 0.042057253420352936,
+   "head_first": 0.3072916666666667,
+   "mean_first": 0.3072916666666667,
+   "ideal_first": 0.6822916666666666
+  },
+  {
+   "family": "vanish",
+   "D": 12,
+   "mean_gain": 0.033555783331394196,
+   "mean_cos": 0.027508702129125595,
+   "head_first": 0.421875,
+   "mean_first": 0.421875,
+   "ideal_first": 0.6458333333333334
+  },
+  {
+   "family": "vanish",
+   "D": 16,
+   "mean_gain": 0.006144315470010042,
+   "mean_cos": 0.0019773913081735373,
+   "head_first": 0.3645833333333333,
+   "mean_first": 0.3645833333333333,
+   "ideal_first": 0.625
+  },
+  {
+   "family": "vanish",
+   "D": 20,
+   "mean_gain": 0.02173527330160141,
+   "mean_cos": 0.010515376925468445,
+   "head_first": 0.4010416666666667,
+   "mean_first": 0.4010416666666667,
+   "ideal_first": 0.6041666666666666
+  },
+  {
+   "family": "vanish",
+   "D": 24,
+   "mean_gain": -0.011402131989598274,
+   "mean_cos": -0.005090290680527687,
+   "head_first": 0.3854166666666667,
+   "mean_first": 0.3854166666666667,
+   "ideal_first": 0.546875
+  },
+  {
+   "family": "vanish",
+   "D": 28,
+   "mean_gain": 7.28073064237833e-06,
+   "mean_cos": -0.0006510298699140549,
+   "head_first": 0.40625,
+   "mean_first": 0.40625,
+   "ideal_first": 0.5
+  },
+  {
+   "family": "vanish",
+   "D": 32,
+   "mean_gain": -0.04044302925467491,
+   "mean_cos": -0.019045718014240265,
+   "head_first": 0.4114583333333333,
+   "mean_first": 0.4114583333333333,
+   "ideal_first": 0.578125
+  },
+  {
+   "family": "vanish",
+   "D": 40,
+   "mean_gain": 0.020470179617404938,
+   "mean_cos": 0.012577848508954048,
+   "head_first": 0.4609375,
+   "mean_first": 0.4609375,
+   "ideal_first": 0.546875
+  },
+  {
+   "family": "vanish",
+   "D": 48,
+   "mean_gain": 0.0708291083574295,
+   "mean_cos": 0.014294257387518883,
+   "head_first": 0.484375,
+   "mean_first": 0.4869791666666667,
+   "ideal_first": 0.5416666666666666
+  },
+  {
+   "family": "rebound",
+   "D": 6,
+   "mean_gain": 0.06421879678964615,
+   "mean_cos": 0.128856360912323,
+   "head_first": 0.3333333333333333,
+   "mean_first": 0.3333333333333333,
+   "ideal_first": 0.71875
+  },
+  {
+   "family": "rebound",
+   "D": 8,
+   "mean_gain": 0.05329209566116333,
+   "mean_cos": 0.10237454622983932,
+   "head_first": 0.3072916666666667,
+   "mean_first": 0.3072916666666667,
+   "ideal_first": 0.7083333333333334
+  },
+  {
+   "family": "rebound",
+   "D": 12,
+   "mean_gain": 0.013564319349825382,
+   "mean_cos": 0.033453747630119324,
+   "head_first": 0.2760416666666667,
+   "mean_first": 0.2760416666666667,
+   "ideal_first": 0.7447916666666666
+  },
+  {
+   "family": "rebound",
+   "D": 16,
+   "mean_gain": 0.003640891518443823,
+   "mean_cos": 0.007951746694743633,
+   "head_first": 0.24479166666666666,
+   "mean_first": 0.25,
+   "ideal_first": 0.71875
+  },
+  {
+   "family": "rebound",
+   "D": 20,
+   "mean_gain": -0.006173709407448769,
+   "mean_cos": -0.011653303168714046,
+   "head_first": 0.265625,
+   "mean_first": 0.265625,
+   "ideal_first": 0.734375
+  },
+  {
+   "family": "rebound",
+   "D": 24,
+   "mean_gain": 0.004673331044614315,
+   "mean_cos": 0.011403991840779781,
+   "head_first": 0.2864583333333333,
+   "mean_first": 0.2864583333333333,
+   "ideal_first": 0.7291666666666666
+  },
+  {
+   "family": "rebound",
+   "D": 28,
+   "mean_gain": 0.003177050966769457,
+   "mean_cos": 0.005679949186742306,
+   "head_first": 0.296875,
+   "mean_first": 0.296875,
+   "ideal_first": 0.6770833333333334
+  },
+  {
+   "family": "rebound",
+   "D": 32,
+   "mean_gain": -0.009035436436533928,
+   "mean_cos": -0.011814022436738014,
+   "head_first": 0.4114583333333333,
+   "mean_first": 0.4114583333333333,
+   "ideal_first": 0.6458333333333334
+  },
+  {
+   "family": "rebound",
+   "D": 40,
+   "mean_gain": 0.010193651542067528,
+   "mean_cos": 0.011433374136686325,
+   "head_first": 0.375,
+   "mean_first": 0.375,
+   "ideal_first": 0.5729166666666666
+  },
+  {
+   "family": "rebound",
+   "D": 48,
+   "mean_gain": -0.0219351164996624,
+   "mean_cos": -0.008274782449007034,
+   "head_first": 0.4010416666666667,
+   "mean_first": 0.4010416666666667,
+   "ideal_first": 0.5572916666666666
+  }
+ ],
+ "variance_share": {}
+}
