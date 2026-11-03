@@ -8,10 +8,11 @@ from pathlib import Path
 
 RUNS = Path("runs")
 FAMS = ("vanish", "rebound")
+WITHDRAWN = {"Q1"}  # criteria met as computed whose evidence the later checks took away
 
 
-def per_run(seed, fam, D, name="xray"):
-    rec = [r for r in json.loads((RUNS / seed / f"{name}.json").read_text())["decisions"] if r["family"] == fam and r["D"] == D]
+def per_run(seed, fam, D):
+    rec = [r for r in json.loads((RUNS / seed / "xray.json").read_text())["decisions"] if r["family"] == fam and r["D"] == D]
     return rec[0]
 
 
@@ -41,9 +42,6 @@ def verdicts(s):
         met &= ok
         rows.append(f"{f}: head {show(d['head_crossing'])}, read {show(d['read_crossing'])}, {ratio:.2f} times at 3 px; read minus head {d['read_minus_head']:+.1f} {_ci(d['read_minus_head_ci'])} at 3 px, {d['read_minus_head_full']:+.1f} {_ci(d['read_minus_head_full_ci'])} at 9 px")
         rows.append(f"{f} by seed, 3 px: head {_list(d['head_crossing_seeds'])}, read {_list(d['read_crossing_seeds'])}")
-        if "read_minus_head_first" in d:
-            rows.append(f"{f}, first frame where the twins differ, both predicted from one state (added after the confirmatory results, so exploratory): head {show(d['head_first_crossing'])} {_ci(d['head_first_crossing_ci'])}, read {show(d['read_first_crossing'])} {_ci(d['read_first_crossing_ci'])}, read minus head {d['read_minus_head_first']:+.1f} {_ci(d['read_minus_head_first_ci'])}")
-            rows.append(f"{f}, same frame at D = {d['D'][0]}: head {d['head_first'][0]:.2f}, read {d['read_first'][0]:.2f}, the observer told the lawful frame {d['ideal_first'][0]:.2f}; levels where the read beats that observer: {sum(r > i for r, i in zip(d['read_first'], d['ideal_first']))} of {len(d['D'])}; brightness the read paints on the sliver against the truth, by level: {min(d['read_gain']):.2f} to {max(d['read_gain']):.2f}, visible {min(d['visible_gain']):.2f} to {max(d['visible_gain']):.2f}")
     out.append(("Q1. Does one state hold more than its head reads out?", met, rows))
 
     rows = []
@@ -62,12 +60,6 @@ def verdicts(s):
             rows.append(f"{f}, {seed}, D = 8: head {r['head']:.3f}, read's four out {r['head_without_read_4']:.3f}, random four out {r['head_without_random_4']:.3f}, extra drop {drop - control:.3f}")
     share = [next(v["variance_share"] for v in run if v["directions"] == "read" and v["k"] == 4) for run in xr("5m")["ablated_variance"]]
     rows.append(f"the read's four carry {_list(share, 4)} of the state's variance")
-    if "control_variance_share" in xr("5m"):
-        for f in FAMS:
-            for seed in seeds:
-                r, c = per_run(seed, f, 8), per_run(seed, f, 8, "first")
-                rows.append(f"{f}, {seed}, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out {c['head_without_cover_4']:.3f}, against the read's four {r['head_without_read_4']:.3f}")
-        rows.append(f"the cover map's four carry {_list(xr('5m')['control_variance_share'], 4)} of the state's variance")
     out.append(("Q3. Does the head use those directions?", met, rows))
 
     rows, met = [], True
@@ -121,7 +113,31 @@ def verdicts(s):
         got = [c["long_rollout"][b]["0.001"] for c in s["sizes"]["5m"]["calibration"]]
         rows.append(f"frames {b}: measured at a promised 1 in 1000: {_list(got, 5)}, {'within' if all(0.0005 <= g <= 0.002 for g in got) else 'outside'} a factor of 2")
     out.append(("Q10. Calibration, demo only", None, rows))
+    out.append(("Checks added after the confirmatory results, so exploratory", None, later(s)))
     return out
+
+
+def later(s):
+    """The first frame where the twins differ, where both are predicted from one state, and the ablation's controls. None of
+    these were in the frozen plan."""
+    xr, ff = s["sizes"]["5m"]["xray"], lambda g: s["sizes"][g]["first_frame"]
+    rows = []
+    for f in FAMS:
+        d = xr["decisions"][f]
+        rows.append(f"{f}, first differing frame: head {show(d['head_first_crossing'])} {_ci(d['head_first_crossing_ci'])}, read {show(d['read_first_crossing'])} {_ci(d['read_first_crossing_ci'])}, read minus head {d['read_minus_head_first']:+.1f} {_ci(d['read_minus_head_first_ci'])}")
+        rows.append(f"{f}, same frame at D = {d['D'][0]}: head {d['head_first'][0]:.2f}, read {d['read_first'][0]:.2f}, the observer told the lawful frame {d['ideal_first'][0]:.2f}; levels where the read beats that observer: {sum(r > i for r, i in zip(d['read_first'], d['ideal_first']))} of {len(d['D'])}")
+        for k, name in (("read", "read"), ("visible", "visible map"), ("mean", "head's mean")):
+            rows.append(f"{f}, {name} on the sliver by level: brightness against the truth {min(d[k + '_gain']):.2f} to {max(d[k + '_gain']):.2f}, share of its predicted change along the sliver {min(d[k + '_cos']):.2f} to {max(d[k + '_cos']):.2f}")
+        share = [(D, x) for D, x in zip(d["D"], ff("5m")[f]["head_share_of_observer"]) if x is not None and x == x]
+        rows.append(f"{f}, 5M head's share of that observer's sensitivity by D, where the observer is at 0.55 or better: {_pairs(*zip(*share))}")
+        rows.append(f"{f}, first differing frame, head crossing by group: " + ", ".join(f"{g} {show(ff(g)[f]['head_first_crossing'])} (seeds {_list(ff(g)[f]['head_first_crossing_seeds'])})" for g in s["sizes"] if ff(g)))
+    for f in FAMS:
+        d = xr["decisions"][f]
+        for key, name in (("head_without_read_4", "the read's four"), ("head_without_cover_4", "four from the slab cover map"), ("head_without_matched_4", "four random, matched to the read's variance"), ("head_without_random_4", "four random")):
+            rows.append(f"{f}, head with {name} out while hidden, by D: {_pairs(d[key]['D'], d[key]['pc'])}")
+    for k, name in (("read_4", "the read's four"), ("cover_4", "the cover map's four"), ("matched_4", "the matched random four")):
+        rows.append(f"share of the state's variance, {name}: {_list(xr['variance_share'][k], 4)}")
+    return rows
 
 
 def _ci(c):
@@ -148,7 +164,10 @@ def main():
     s = json.loads(Path("results/summary.json").read_text())
     lines = ["# The analysis plan, evaluated", "", f"Written by `python -m sm.plan` from `results/summary.json`, against `docs/analysis-plan.md`. Confirmatory 5M seeds: {', '.join(s['sizes']['5m']['seeds'])}.", ""]
     for title, met, rows in verdicts(s):
-        lines += [f"## {title}", "", f"**{'Reported, no pass or fail' if met is None else 'Met' if met else 'Not met'}.**", ""] + [f"- {r}" for r in rows] + [""]
+        verdict = "Reported, no pass or fail" if met is None else "Met" if met else "Not met"
+        if met and title.split(".")[0] in WITHDRAWN:
+            verdict += " as computed. Not used as evidence: see Changes after the freeze in docs/analysis-plan.md"
+        lines += [f"## {title}", "", f"**{verdict}.**", ""] + [f"- {r}" for r in rows] + [""]
     Path("results/plan.md").write_text("\n".join(lines))
     print("\n".join(lines))
 

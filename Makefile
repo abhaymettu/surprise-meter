@@ -5,6 +5,7 @@ results:
 	$(PY) -m sm.analyze
 	$(PY) -m sm.figures
 	$(PY) -m sm.plan
+	$(PY) -m sm.copycheck
 
 # Run the measurements again from the published weights, then redo the results. Hours on an M-series Mac.
 measure: weights

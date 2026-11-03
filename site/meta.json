@@ -1,22 +1,22 @@
 {
   "kind": "project",
   "title": "surprise-meter",
-  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with an ideal observer as the yardstick. That yardstick caught a probe that seemed to see more than the model and was only drawing the ball too bright.",
+  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with observers that know the laws as the yardstick. One of those observers caught a probe that seemed to see more than the model and was drawing the ball too bright.",
   "summary": "Lets anyone watch a world model guess each frame in the browser, break its physics with a finger, and see how surprised it is.",
   "repo": "https://github.com/abhaymettu/surprise-meter",
   "hero_image": {
     "light": "results/figures/vanish.png",
-    "alt": "A ball goes behind a slab in a small noisy frame, and an outline of where the model's state places the hidden ball is drawn over it."
+    "alt": "A ball goes behind a slab in a small noisy frame, and an outline of where a linear read of the model's state places the hidden ball is drawn over it."
   },
   "headline_numbers": [
     {
-      "label": "on the first frame where the twins differ, 4 frames hidden: the probe's proportion correct against the observer told the lawful frame",
-      "value": "0.78 against 0.66",
+      "label": "hidden frames before the model stops favoring the lawful clip, on four seeds trained after the analysis plan was frozen",
+      "value": "8.8",
       "command": "python -m sm.plan"
     },
     {
       "label": "efficiency on a teleport, against an observer that knows the laws but not where the balls started",
-      "value": "0.216",
+      "value": "0.221",
       "command": "python -m sm.plan"
     }
   ],
@@ -27,7 +27,7 @@
     }
   ],
   "site": {
-    "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against an ideal observer. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat the observer that knows the answer, 0.78 against 0.66. It was painting the ball 1.2 to 1.9 times too bright.",
+    "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against observers that know the laws. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat an observer told the answer, 0.78 against 0.66. It was drawing the ball 1.4 to 1.8 times too bright, and aiming worse than the model.",
     "group": "ml",
     "field": "ml"
   }

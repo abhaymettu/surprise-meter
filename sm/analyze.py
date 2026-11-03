@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import norm
 
 from . import events as E
 
@@ -28,7 +29,7 @@ TRAIN_REVEAL_MAX = 41  # the longest hidden run seen in a training clip; longer 
 EXPLORATORY = {"5m-s0"}  # watched while this analysis was built, so it leaves its group once a confirmatory seed exists
 READERS = ("head", "mean", "refit", "visible", "read")
 ABLATED = [f"head_without_{name}_{k}" for k in (4, 16) for name in ("read", "random")]
-CONTROL = "head_without_cover_4"  # sm.first: directions chosen the same way from a probe for slab cover
+FIRST_CONTROLS = ("head_without_cover_4", "head_without_matched_4")  # sm.first: from a probe for slab cover; random, with the read's share of variance
 
 
 def load(path):
@@ -283,15 +284,41 @@ def xray(group, rng):
             for key in [k + "_first" for k in READERS + ("ideal",)]:
                 rec[key] = np.mean([[x[key] for x in p] for p in pick_first], 0)
             rec["ideal_first_crossing"] = falls_through(rec["ideal_first"], rec["D"], 0.5)
-            for k in ("refit", "visible", "read"):
-                rec[k + "_gain"] = np.mean([[x[k + "_gain"] for x in p] for p in pick_first], 0)
-            rec[CONTROL] = {"D": [x["D"] for x in pick_first[0] if CONTROL in x], "pc": np.mean([[x[CONTROL] for x in p if CONTROL in x] for p in pick_first], 0)}
+            for key in [k + s for k in READERS[1:] for s in ("_gain", "_cos")]:
+                if all(key in x for p in pick_first for x in p):
+                    rec[key] = np.mean([[x[key] for x in p] for p in pick_first], 0)
+            for key in FIRST_CONTROLS:
+                if all(any(key in x for x in p) for p in pick_first):
+                    rec[key] = {"D": [x["D"] for x in pick_first[0] if key in x], "pc": np.mean([[x[key] for x in p if key in x] for p in pick_first], 0)}
         for key in ABLATED:
             kept = [x for x in pick[0] if key in x]
             rec[key] = {"D": [x["D"] for x in kept], "pc": np.mean([[x[key] for x in p if key in x] for p in pick], 0)}
         out["decisions"][fam] = rec
-    if len(firsts) == len(dirs):
-        out["control_variance_share"] = [r["control_variance_share"] for r in first_runs]
+    if len(firsts) == len(dirs) and all("variance_share" in r for r in first_runs):
+        out["variance_share"] = {k: [r["variance_share"][k] for r in first_runs] for k in first_runs[0]["variance_share"]}
+    return out
+
+
+def first_frame(group):
+    """The head on the first frame where the twins differ, for every run of a group the window model included, against the
+    observer told the lawful frame on the same scenes. A fixed-noise reader's z-score there is (2g - 1) times the observer's,
+    g being the share of the sliver's brightness it draws, so their ratio says how much of the observer's sensitivity is left
+    whatever the scenes' sliver sizes. Where the observer itself is under 0.55 the ratio is left out."""
+    runs = [json.loads((p / "first.json").read_text()) for p in seed_dirs(group) if (p / "first.json").exists()]
+    if not runs:
+        return None
+    out = {}
+    for fam in DURATION:
+        pick = [[x for x in r["decisions"] if x["family"] == fam] for r in runs]
+        rec = {"D": [x["D"] for x in pick[0]]}
+        for key in [k for k in ("head_first", "mean_first", "ideal_first", "mean_gain", "mean_cos") if all(k in x for p in pick for x in p)]:
+            rec[key + "_seeds"] = np.array([[x[key] for x in p] for p in pick])
+            rec[key] = rec[key + "_seeds"].mean(0)
+        rec["head_first_crossing"] = falls_through(rec["head_first"], rec["D"], 0.5)
+        rec["head_first_crossing_seeds"] = [falls_through(row, rec["D"], 0.5) for row in rec["head_first_seeds"]]
+        z = lambda pc: norm.ppf(np.clip(pc, 1e-3, 1 - 1e-3))
+        rec["head_share_of_observer"] = np.where(rec["ideal_first"] >= 0.55, z(rec["head_first"]) / z(rec["ideal_first"]), np.nan)  # undefined near chance
+        out[fam] = rec
     return out
 
 
@@ -322,7 +349,7 @@ def summary():
 
     for g in groups:
         names = [p.name for p in seed_dirs(g)]
-        out["sizes"][g] = {"seeds": names, "calibration": [json.loads((RUNS / n / "eval.json").read_text()) for n in names], "xray": xray(g, rng)}
+        out["sizes"][g] = {"seeds": names, "calibration": [json.loads((RUNS / n / "eval.json").read_text()) for n in names], "xray": xray(g, rng), "first_frame": first_frame(g)}
     for name in EXPLORATORY:
         if all(name not in rec["seeds"] for rec in out["sizes"].values()) and (RUNS / name / "eval.npz").exists():
             ev = load(RUNS / name)

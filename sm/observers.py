@@ -1,9 +1,12 @@
 """Reference observers, all with the true pixel noise as their likelihood, N(prediction, NOISE^2).
 
-  ideal    knows the lawful continuation of every clip exactly. This is the signal-known-exactly observer of
-           detection theory, and no observer can separate the twins better
-  causal   knows the laws, the scene, radii and brightness but not where the balls started or how fast: the most any
-           observer can get from the frames themselves. See evaluate.CausalIdeal
+Each scores a clip as the model does, by its likelihood under the observer's own prediction. That makes them references
+for a calibrated prediction, not bounds on the task: the twins share their noise, so a rule that compared the two clips
+directly would always be right, and on a single frame a reader that draws a ball brighter than it is can beat `ideal`.
+
+  ideal    knows the lawful continuation of every clip exactly
+  causal   knows the laws, the scene, radii and brightness but not where the balls started or how fast: the best
+           calibrated prediction the frames themselves allow. See evaluate.CausalIdeal
   walls    sees every visible ball perfectly, assumes constant velocity with wall bounces, remembers hidden balls
   cv       wall-blind dead reckoning: the same with no walls
   cv0      the same again, but a ball out of sight is forgotten

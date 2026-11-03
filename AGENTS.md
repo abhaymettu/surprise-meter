@@ -10,7 +10,7 @@ JavaScript and WebGPU for the browser demo.
 - `sm/model.py` the recurrent model and the windowed control. `sm/train.py` trains and resumes.
 - `sm/surprise.py` defines surprisal, excess, evidence and surprise. Read its docstring before changing anything downstream.
 - `sm/observers.py` dead reckoning with walls, wall-blind, no memory, and frozen at last seen. The observer told the state and the causal ideal are in `sm/evaluate.py`.
-- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear maps on a frozen state and scores five readers on the twins `sm.evaluate` scored. `sm/first.py` scores them again on the first frame where the twins differ, where both come from one state, beside the ideal observer, and runs the cover-probe control for the ablation. Over a longer window each twin is scored under its own state, so read the reader comparison from `sm.first`. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
+- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear maps on a frozen state and scores five readers on the twins `sm.evaluate` scored. `sm/first.py` scores them again on the first frame where the twins differ, where both come from one state, beside the observer told the lawful frame, reports each reader's brightness and aim on the emerging sliver, runs the ablation's cover and variance-matched controls, and scores the window model's head as a memory null. Over a longer window each twin is scored under its own state, so read the reader comparison from `sm.first`. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
 - `sm/ladder.py` is the experiment plan. `sm/export.py` packages a run for `demo/`.
 
 ## Commands
@@ -31,4 +31,6 @@ JavaScript and WebGPU for the browser demo.
 - Colors in figures and the demo differ in lightness as well as hue, with the meaning also in text or shape.
 - Everything the demo says about the model has to have been measured. Check captions against `sm/evaluate.py` output or a browser trial first.
 
-`sm/plan.py` evaluates the criteria in `docs/analysis-plan.md` and writes `results/plan.md`. A verdict comes from there, never from reading a table by eye.
+`sm/plan.py` evaluates the criteria in `docs/analysis-plan.md` and writes `results/plan.md`. A verdict comes from there, never from reading a table by eye. `sm/copycheck.py`, the last step of `make results`, fails when a number in the README or `site/` is not in the results.
+
+The demo deploys to Pages from `.github/workflows/pages.yml` on every push to `main` that touches `demo/`.

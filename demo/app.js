@@ -91,7 +91,7 @@ async function tick() {
   if (!frozen) stepWorld(world);
   if (wantVanish) {
     const b = world.balls.find((b) => b.alive && hiddenFully(b));
-    if (b) { b.alive = false; wantVanish = false; b.goneAt = performance.now(); mark("deleted while hidden"); uiState(); caption("The ball is gone, but the model was not told. Its picture of the ball keeps moving.", 0); }
+    if (b) { b.alive = false; wantVanish = false; b.goneAt = performance.now(); mark("deleted while hidden"); uiState(); caption("The ball is gone, but the model was not told. The outline read from its state keeps moving.", 0); }
   }
   respawnIfEmpty();
   renderWorld(world, frame);

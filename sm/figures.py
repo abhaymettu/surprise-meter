@@ -346,7 +346,7 @@ def tables(s):
         for name, key in (("head", "head"), ("head's mean at the world's noise", "mean"), ("ridge to the next frame", "refit"), ("ridge to visible pixels, through decoded slabs", "visible"), ("linear read through decoded slabs", "read")):
             for window, w in (("3 px", ""), ("full", "_full")):
                 d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
-                rows.append([fam, f"{name}, {window}"] + [crossing(x[key + w + "_crossing"], 4, x[key + w + "_crossing_ci"]) for x in d])
+                rows.append([fam, f"{name}, {window}"] + [crossing(x[key + w + "_crossing"], x["D"][0], x[key + w + "_crossing_ci"]) for x in d])
         for name, key, base in (("head's mean minus head", "mean", "head"), ("ridge to the next frame minus head", "refit", "head"), ("ridge to visible pixels minus ridge to the next frame", "visible", "refit"), ("linear read minus ridge to visible pixels", "read", "visible"), ("linear read minus head", "read", "head")):
             for window, w in (("3 px", ""), ("full", "_full")):
                 d = [s["sizes"][g]["xray"]["decisions"][fam] for g in gx]
