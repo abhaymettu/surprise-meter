@@ -1,7 +1,7 @@
 {
   "kind": "project",
   "title": "surprise-meter",
-  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with observers that know the laws as the yardstick. One of those observers caught a probe that seemed to see more than the model and was drawing the ball too bright.",
+  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with observers that know the laws as the yardstick. One of those observers caught a probe that seemed to see more than the model and was putting more light where the ball comes out than the ball has.",
   "summary": "Lets anyone watch a world model guess each frame in the browser, break its physics with a finger, and see how surprised it is.",
   "repo": "https://github.com/abhaymettu/surprise-meter",
   "hero_image": {
@@ -10,7 +10,7 @@
   },
   "headline_numbers": [
     {
-      "label": "hidden frames before the model stops favoring the lawful clip, on four seeds trained after the analysis plan was frozen",
+      "label": "hidden frames before the model stops favoring the lawful clip when a hidden ball is deleted, scored over its first 3 px out, on four seeds trained after the analysis plan was frozen",
       "value": "8.8",
       "command": "python -m sm.plan"
     },
@@ -27,7 +27,7 @@
     }
   ],
   "site": {
-    "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against observers that know the laws. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat an observer told the answer, 0.78 against 0.66. It was drawing the ball 1.4 to 1.8 times too bright, and aiming worse than the model.",
+    "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against observers that know the laws. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat an observer told the answer, 0.78 against 0.66. It was putting 1.4 to 1.8 times the ball's light where the ball comes out.",
     "group": "ml",
     "field": "ml"
   }
