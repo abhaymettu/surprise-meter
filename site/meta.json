@@ -29,6 +29,7 @@
   "site": {
     "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against observers that know the laws. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat an observer told the answer, 0.78 against 0.66. It was putting 1.4 to 1.8 times the ball's light where the ball comes out.",
     "group": "ml",
-    "field": "ml"
+    "field": "ml",
+    "eyebrow": "Recurrent world model · trained on pixels · psychophysics · MIT"
   }
 }
