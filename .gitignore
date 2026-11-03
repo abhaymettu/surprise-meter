@@ -13,3 +13,4 @@ runs/pilot-*/
 runs/*-half/
 runs/observers/*.log
 demo/*.parity.json
+*.egg-info/
