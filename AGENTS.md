@@ -30,3 +30,5 @@ JavaScript and WebGPU for the browser demo.
 - The browser engines must match MLX. After any model change run the parity checks before trusting the demo.
 - Colors in figures and the demo differ in lightness as well as hue, with the meaning also in text or shape.
 - Everything the demo says about the model has to have been measured. Check captions against `sm/evaluate.py` output or a browser trial first.
+
+`sm/plan.py` evaluates the criteria in `docs/analysis-plan.md` and writes `results/plan.md`. A verdict comes from there, never from reading a table by eye.
