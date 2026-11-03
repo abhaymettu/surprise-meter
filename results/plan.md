@@ -6,23 +6,27 @@ Written by `python -m sm.plan` from `results/summary.json`, against `docs/analys
 
 **Met.**
 
-- vanish: head 8.9, read 21.1, 2.37 times at 3 px; read minus head +12.2 [7.4, 16.2] at 3 px, +21.8 [18.5, 24.5] at 9 px
+- vanish: head 8.9, read 21.1, 2.37 times at 3 px; read minus head +12.2 [7.5, 16.2] at 3 px, +21.8 [18.5, 24.4] at 9 px
 - vanish by seed, 3 px: head 8.1, 9.6, read 16.6, 24.7
+- vanish, first frame where the twins differ, both predicted from one state (added after the confirmatory results, so exploratory): head 25.0 [11.3, 28.5], read 48.0 [26.6, 48.0], read minus head +23.0 [4.7, 33.8]
+- vanish, same frame at D = 4: head 0.57, read 0.78, the observer told the lawful frame 0.66; levels where the read beats that observer: 11 of 11; brightness the read paints on the sliver against the truth, by level: 1.17 to 1.86, visible 1.32 to 3.35
 - rebound: head 9.3, read 26.2, 2.83 times at 3 px; read minus head +17.0 [13.1, 30.3] at 3 px, +26.5 [23.3, 33.5] at 9 px
 - rebound by seed, 3 px: head 9.0, 9.6, read 22.9, 30.1
+- rebound, first frame where the twins differ, both predicted from one state (added after the confirmatory results, so exploratory): head 33.3 [16.3, 41.7], read 48.0 [44.2, 48.0], read minus head +14.7 [5.9, 31.2]
+- rebound, same frame at D = 6: head 0.60, read 0.79, the observer told the lawful frame 0.72; levels where the read beats that observer: 6 of 10; brightness the read paints on the sliver against the truth, by level: 0.87 to 1.52, visible 1.04 to 2.25
 
 ## Q2. Where does the gap come from?
 
 **Reported, no pass or fail.**
 
-- vanish, the learned variance (mean against head): +1.1 [0.6, 1.8], not the cause
+- vanish, the learned variance (mean against head): +1.1 [0.6, 1.7], not the cause
 - vanish, how the map was trained (refit against head): +1.0 [0.4, 1.6], not the cause
-- vanish, covered pixels and drawing through slabs (visible against refit): +2.5 [1.5, 3.6], counts
-- vanish, being told where the hidden ball is (read against visible): +8.8 [4.0, 12.6], counts
-- rebound, the learned variance (mean against head): +3.3 [1.1, 16.2], counts
-- rebound, how the map was trained (refit against head): +3.6 [1.4, 16.3], counts
-- rebound, covered pixels and drawing through slabs (visible against refit): +6.0 [3.1, 8.8], counts
-- rebound, being told where the hidden ball is (read against visible): +7.3 [4.0, 11.4], counts
+- vanish, covered pixels and drawing through slabs (visible against refit): +2.5 [1.7, 3.9], counts
+- vanish, being told where the hidden ball is (read against visible): +8.8 [3.9, 12.7], counts
+- rebound, the learned variance (mean against head): +3.3 [1.1, 15.5], counts
+- rebound, how the map was trained (refit against head): +3.6 [1.3, 16.0], counts
+- rebound, covered pixels and drawing through slabs (visible against refit): +6.0 [2.8, 9.0], counts
+- rebound, being told where the hidden ball is (read against visible): +7.3 [4.0, 11.9], counts
 
 ## Q3. Does the head use those directions?
 
@@ -33,6 +37,11 @@ Written by `python -m sm.plan` from `results/summary.json`, against `docs/analys
 - rebound, 5m-s1, D = 8: head 0.542, read's four out 0.052, random four out 0.401, extra drop 0.349
 - rebound, 5m-s2, D = 8: head 0.547, read's four out 0.031, random four out 0.411, extra drop 0.380
 - the read's four carry 0.0032, 0.0028 of the state's variance
+- vanish, 5m-s1, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out 0.005, against the read's four 0.052
+- vanish, 5m-s2, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out 0.005, against the read's four 0.078
+- rebound, 5m-s1, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out 0.031, against the read's four 0.052
+- rebound, 5m-s2, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out 0.021, against the read's four 0.031
+- the cover map's four carry 0.0839, 0.0688 of the state's variance
 
 ## Q4. Does the read follow an unseen bounce?
 
@@ -55,10 +64,12 @@ Written by `python -m sm.plan` from `results/summary.json`, against `docs/analys
 
 **Not met.**
 
-- vanish, head at 3 px: 1M 2.6 [2.4, 2.9], 5M 8.9 [7.3, 10.0], 5M short 2.9 [2.6, 3.1], 1M long not measured yet, 20M 9.8 [9.2, 10.3]
-- vanish, trace halves: 1M 3.9 [3.6, 5.6], 5M 4.0 [3.5, 5.7]
-- rebound, head at 3 px: 1M below the first level [below the first level, below the first level], 5M 9.3 [below the first level, 10.7], 5M short below the first level [below the first level, below the first level], 1M long not measured yet, 20M 10.6 [9.4, 12.1]
-- rebound, trace halves: 1M 17.9 [16.3, 19.4], 5M 25.3 [21.6, 28.5]
+- vanish, head at 3 px: 1M 2.6 [2.3, 2.9], 5M 8.9 [7.3, 10.0], 5M short 2.9 [2.7, 3.1], 1M long 9.4 [8.5, 10.3], 20M 9.8 [9.2, 10.3]
+- vanish, trace halves: 1M 3.9 [3.6, 5.4], 5M 4.0 [3.5, 5.9]
+- vanish: 1M long reaches 5M's interval: True
+- rebound, head at 3 px: 1M below the first level [below the first level, below the first level], 5M 9.3 [below the first level, 10.7], 5M short below the first level [below the first level, below the first level], 1M long 11.4 [10.6, 12.6], 20M 10.6 [9.3, 12.1]
+- rebound, trace halves: 1M 17.9 [16.0, 19.5], 5M 25.3 [21.8, 28.4]
+- rebound: 1M long reaches 5M's interval: True
 
 ## Q7. Is there a speed-independent fall?
 
@@ -66,15 +77,15 @@ Written by `python -m sm.plan` from `results/summary.json`, against `docs/analys
 
 - 0.15 to 0.4 px per frame: below the first level
 - 0.4 to 0.6 px per frame: 9.5
-- 0.6 to 1.3 px per frame: 12.0
+- 0.6 to 1.3 px per frame: past 12, the longest hidden time with scenes in this band
 
 ## Q8. Efficiency
 
 **Reported, no pass or fail.**
 
 - teleport: against the causal ideal 0.216 [0.168, 0.310], against the state told 0.085
-- phantom: against the causal ideal 0.122 [0.105, 0.251], against the state told 0.054
-- deflect: against the causal ideal 0.034 [0.026, 0.046], against the state told 0.017
+- phantom: against the causal ideal 0.122 [0.104, 0.248], against the state told 0.054
+- deflect: against the causal ideal 0.034 [0.026, 0.045], against the state told 0.017
 
 ## Q9. Collision bias: quoted if under 1 in every seed
 

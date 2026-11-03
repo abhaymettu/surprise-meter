@@ -28,6 +28,7 @@ TRAIN_REVEAL_MAX = 41  # the longest hidden run seen in a training clip; longer 
 EXPLORATORY = {"5m-s0"}  # watched while this analysis was built, so it leaves its group once a confirmatory seed exists
 READERS = ("head", "mean", "refit", "visible", "read")
 ABLATED = [f"head_without_{name}_{k}" for k in (4, 16) for name in ("read", "random")]
+CONTROL = "head_without_cover_4"  # sm.first: directions chosen the same way from a probe for slab cover
 
 
 def load(path):
@@ -224,15 +225,15 @@ def agreement(d):
     return np.mean((d > 0) + 0.5 * (d == 0), -1)
 
 
-def reader_gaps(margins, fam, levels, rng):
+def reader_gaps(margins, fam, levels, rng, windows=("", "_full")):
     """Crossing of each reader with a hierarchical bootstrap interval, and how far each outlasts the head on the same seeds
     and scenes."""
-    a = {f"{k}{w}": np.array([[m[f"{fam}/{D}/{k}{w}"] for D in levels] for m in margins]) for k in READERS for w in ("", "_full")}  # seeds, levels, scenes
+    a = {f"{k}{w}": np.array([[m[f"{fam}/{D}/{k}{w}"] for D in levels] for m in margins]) for k in READERS for w in windows}  # seeds, levels, scenes
     point = lambda key, s, i: falls_through(agreement(a[key][s][:, :, i]).mean(0), levels, 0.5)
-    every, scenes = np.arange(len(margins)), np.arange(a["head"].shape[-1])
+    every, scenes = np.arange(len(margins)), np.arange(a["head" + windows[0]].shape[-1])
     draws = [(rng.integers(0, len(margins), len(margins)), rng.integers(0, len(scenes), len(scenes))) for _ in range(BOOT)]
     out = {}
-    for w in ("", "_full"):
+    for w in windows:
         crossing = {k: [point(k + w, s, i) for s, i in draws] for k in READERS}
         for k in READERS:
             out[f"{k}{w}_crossing"], out[f"{k}{w}_crossing_ci"] = point(k + w, every, scenes), np.percentile(crossing[k], [2.5, 97.5])
@@ -250,6 +251,8 @@ def xray(group, rng):
         return None
     runs = [json.loads((p / "xray.json").read_text()) for p in dirs]
     margins = [np.load(p / "xray.npz") for p in dirs]
+    firsts = [np.load(p / "first.npz") for p in dirs if (p / "first.npz").exists()]
+    first_runs = [json.loads((p / "first.json").read_text()) for p in dirs if (p / "first.json").exists()]
     for p, m in zip(dirs, margins):  # the head here and in sm.evaluate are two code paths over the same scenes and must agree
         ev = load(p)
         for key in m.files:
@@ -274,10 +277,21 @@ def xray(group, rng):
             rec[key], rec[key + "_seeds"] = a.mean(0), a
             rec[key + "_crossing_seeds"] = [falls_through(row, rec["D"], 0.5) for row in a]
         rec.update(reader_gaps(margins, fam, rec["D"], rng))
+        if len(firsts) == len(dirs):  # its own draws, so adding it moves no other interval
+            rec.update(reader_gaps(firsts, fam, rec["D"], np.random.default_rng(1), ("_first",)))
+            pick_first = [[x for x in r["decisions"] if x["family"] == fam] for r in first_runs]
+            for key in [k + "_first" for k in READERS + ("ideal",)]:
+                rec[key] = np.mean([[x[key] for x in p] for p in pick_first], 0)
+            rec["ideal_first_crossing"] = falls_through(rec["ideal_first"], rec["D"], 0.5)
+            for k in ("refit", "visible", "read"):
+                rec[k + "_gain"] = np.mean([[x[k + "_gain"] for x in p] for p in pick_first], 0)
+            rec[CONTROL] = {"D": [x["D"] for x in pick_first[0] if CONTROL in x], "pc": np.mean([[x[CONTROL] for x in p if CONTROL in x] for p in pick_first], 0)}
         for key in ABLATED:
             kept = [x for x in pick[0] if key in x]
             rec[key] = {"D": [x["D"] for x in kept], "pc": np.mean([[x[key] for x in p if key in x] for p in pick], 0)}
         out["decisions"][fam] = rec
+    if len(firsts) == len(dirs):
+        out["control_variance_share"] = [r["control_variance_share"] for r in first_runs]
     return out
 
 

@@ -9,7 +9,7 @@ results:
 # Run the measurements again from the published weights, then redo the results. Hours on an M-series Mac.
 measure: weights
 	for k in ideal causal walls cv cv0 frozen; do $(PY) -m sm.evaluate $$k; done
-	for r in runs/*-s[0-9]; do $(PY) -m sm.evaluate $$r && case $$r in *window*) ;; *) $(PY) -m sm.xray $$r ;; esac; done
+	for r in runs/*-s[0-9]; do $(PY) -m sm.evaluate $$r && case $$r in *window*) ;; *) $(PY) -m sm.xray $$r && $(PY) -m sm.first $$r ;; esac; done
 	$(MAKE) results
 
 weights:

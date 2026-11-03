@@ -1,0 +1,34 @@
+{
+  "kind": "project",
+  "title": "surprise-meter",
+  "gist": "A small world model trained from scratch on a laptop, on nothing but next-frame pixels, and tested the way psychophysics tests a person: a lawful clip against an impossible twin, with an ideal observer as the yardstick. That yardstick showed a probe that seemed to see more than the model was only drawing too bright.",
+  "summary": "Lets anyone watch a world model guess each frame in the browser, break its physics with a finger, and see how surprised it is.",
+  "repo": "https://github.com/abhaymettu/surprise-meter",
+  "hero_image": {
+    "light": "results/figures/vanish.png",
+    "alt": "A ball goes behind a slab in a small noisy frame, and an outline of where the model's state places the hidden ball is drawn over it."
+  },
+  "headline_numbers": [
+    {
+      "label": "on the first frame where the twins differ, 4 frames hidden: the probe's proportion correct against the observer told the lawful frame",
+      "value": "0.78 against 0.66",
+      "command": "python -m sm.plan"
+    },
+    {
+      "label": "efficiency on a teleport, against an observer that knows the laws but not where the balls started",
+      "value": "0.216",
+      "command": "python -m sm.plan"
+    }
+  ],
+  "links": [
+    {
+      "label": "Run the model in your browser",
+      "href": "https://abhaymettu.github.io/surprise-meter/"
+    }
+  ],
+  "site": {
+    "blurb": "A world model trained on next-frame pixels, tested with matched lawful and impossible clips against an ideal observer. A probe of its state seemed to keep a hidden ball in view more than twice as long as the model did, until on a frame where both clips share one state it beat the observer that knows the answer, 0.78 against 0.66. It was painting the ball 1.2 to 1.9 times too bright.",
+    "group": "ml",
+    "field": "ml"
+  }
+}

@@ -10,7 +10,7 @@ JavaScript and WebGPU for the browser demo.
 - `sm/model.py` the recurrent model and the windowed control. `sm/train.py` trains and resumes.
 - `sm/surprise.py` defines surprisal, excess, evidence and surprise. Read its docstring before changing anything downstream.
 - `sm/observers.py` dead reckoning with walls, wall-blind, no memory, and frozen at last seen. The observer told the state and the causal ideal are in `sm/evaluate.py`.
-- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear maps on a frozen state and scores five readers on the twins `sm.evaluate` scored. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
+- `sm/evaluate.py` writes `runs/<name>/eval.npz`. `sm/xray.py` fits the linear maps on a frozen state and scores five readers on the twins `sm.evaluate` scored. `sm/first.py` scores them again on the first frame where the twins differ, where both come from one state, beside the ideal observer, and runs the cover-probe control for the ablation. Over a longer window each twin is scored under its own state, so read the reader comparison from `sm.first`. `sm/analyze.py` turns those into `results/summary.json`. `sm/figures.py` turns that into `results/figures/` and `results/tables.md`.
 - `sm/ladder.py` is the experiment plan. `sm/export.py` packages a run for `demo/`.
 
 ## Commands

@@ -10,8 +10,8 @@ RUNS = Path("runs")
 FAMS = ("vanish", "rebound")
 
 
-def per_run(seed, fam, D):
-    rec = [r for r in json.loads((RUNS / seed / "xray.json").read_text())["decisions"] if r["family"] == fam and r["D"] == D]
+def per_run(seed, fam, D, name="xray"):
+    rec = [r for r in json.loads((RUNS / seed / f"{name}.json").read_text())["decisions"] if r["family"] == fam and r["D"] == D]
     return rec[0]
 
 
@@ -41,6 +41,9 @@ def verdicts(s):
         met &= ok
         rows.append(f"{f}: head {show(d['head_crossing'])}, read {show(d['read_crossing'])}, {ratio:.2f} times at 3 px; read minus head {d['read_minus_head']:+.1f} {_ci(d['read_minus_head_ci'])} at 3 px, {d['read_minus_head_full']:+.1f} {_ci(d['read_minus_head_full_ci'])} at 9 px")
         rows.append(f"{f} by seed, 3 px: head {_list(d['head_crossing_seeds'])}, read {_list(d['read_crossing_seeds'])}")
+        if "read_minus_head_first" in d:
+            rows.append(f"{f}, first frame where the twins differ, both predicted from one state (added after the confirmatory results, so exploratory): head {show(d['head_first_crossing'])} {_ci(d['head_first_crossing_ci'])}, read {show(d['read_first_crossing'])} {_ci(d['read_first_crossing_ci'])}, read minus head {d['read_minus_head_first']:+.1f} {_ci(d['read_minus_head_first_ci'])}")
+            rows.append(f"{f}, same frame at D = {d['D'][0]}: head {d['head_first'][0]:.2f}, read {d['read_first'][0]:.2f}, the observer told the lawful frame {d['ideal_first'][0]:.2f}; levels where the read beats that observer: {sum(r > i for r, i in zip(d['read_first'], d['ideal_first']))} of {len(d['D'])}; brightness the read paints on the sliver against the truth, by level: {min(d['read_gain']):.2f} to {max(d['read_gain']):.2f}, visible {min(d['visible_gain']):.2f} to {max(d['visible_gain']):.2f}")
     out.append(("Q1. Does one state hold more than its head reads out?", met, rows))
 
     rows = []
@@ -59,6 +62,12 @@ def verdicts(s):
             rows.append(f"{f}, {seed}, D = 8: head {r['head']:.3f}, read's four out {r['head_without_read_4']:.3f}, random four out {r['head_without_random_4']:.3f}, extra drop {drop - control:.3f}")
     share = [next(v["variance_share"] for v in run if v["directions"] == "read" and v["k"] == 4) for run in xr("5m")["ablated_variance"]]
     rows.append(f"the read's four carry {_list(share, 4)} of the state's variance")
+    if "control_variance_share" in xr("5m"):
+        for f in FAMS:
+            for seed in seeds:
+                r, c = per_run(seed, f, 8), per_run(seed, f, 8, "first")
+                rows.append(f"{f}, {seed}, D = 8, control added after the confirmatory results: four directions chosen the same way from the map to slab cover, out {c['head_without_cover_4']:.3f}, against the read's four {r['head_without_read_4']:.3f}")
+        rows.append(f"the cover map's four carry {_list(xr('5m')['control_variance_share'], 4)} of the state's variance")
     out.append(("Q3. Does the head use those directions?", met, rows))
 
     rows, met = [], True
@@ -94,7 +103,8 @@ def verdicts(s):
             rows.append(f"{f}: 1M long reaches 5M's interval: {long['crossing'] >= big['crossing_ci'][0]}")
     out.append(("Q6. What does size do at equal training? (met means bigger decides better, on both families)", all(parts) if fam("vanish", "5m-short") else None, rows))
 
-    rows = [f"{b['band'][0]} to {b['band'][1]} px per frame: {show(b['crossing'])}" for b in van["speed"]]
+    band = lambda b: f"past {b['levels'][-1]}, the longest hidden time with scenes in this band" if b["pc"][-1] >= 0.5 else show(b["crossing"])
+    rows = [f"{b['band'][0]} to {b['band'][1]} px per frame: {band(b)}" for b in van["speed"]]
     out.append(("Q7. Is there a speed-independent fall?", None, rows))
 
     rows = []

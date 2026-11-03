@@ -63,6 +63,8 @@ def main():
             run("sm.evaluate", str(d))
         if not j["window"] and not (d / "xray.json").exists():
             run("sm.xray", str(d))
+        if not j["window"] and not (d / "first.json").exists():
+            run("sm.first", str(d))
         if j["name"] == a.stop_after:
             return
     if not a.list:

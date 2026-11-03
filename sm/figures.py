@@ -379,7 +379,8 @@ def tables(s):
         lines += [f"## {name}, watched while the analysis was built and so left out of its group: crossing in frames", ""]
         table("family | 3 px | full emergence", [[fam, crossing(rec[fam], s["families"][fam]["levels"][0]), crossing(rec[fam + "_full"], s["families"][fam]["levels"][0])] for fam in ("vanish", "rebound")])
     lines += ["## Speed bands, vanish: crossing in frames", ""]
-    table("band, px per frame | " + names(present), [[f"{b['band'][0]} to {b['band'][1]}"] + [crossing(s["families"]["vanish"]["sizes"][g]["speed"][i]["crossing"], b["levels"][0]) for g in present] for i, b in enumerate(s["families"]["vanish"]["sizes"][present[0]]["speed"])])
+    band = lambda r: crossing(r["crossing"], r["levels"][0], last=r["levels"][-1])
+    table("band, px per frame | " + names(present), [[f"{b['band'][0]} to {b['band'][1]}"] + [band(s["families"]["vanish"]["sizes"][g]["speed"][i]) for g in present] for i, b in enumerate(s["families"]["vanish"]["sizes"][present[0]]["speed"])])
     lines += ["## Restitution where the model's likelihood peaks (the world's is 1)", ""]
     table("size | restitution | by seed", [[SIZE_STYLE[g]["label"], f"{1 - s['families']['collision']['sizes'][g]['peak_error']:.2f}", ", ".join(f"{1 - x:.2f}" for x in s["families"]["collision"]["sizes"][g]["peak_error_seeds"])] for g in present])
     lines += ["## A ball passing through a wall: pairs favouring the lawful twin", ""]
