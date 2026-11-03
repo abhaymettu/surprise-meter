@@ -1,4 +1,4 @@
-PY ?= python
+PY ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 # Every table and figure, from the measurements in this repo. About two minutes.
 results:
@@ -13,7 +13,7 @@ measure: weights
 	$(MAKE) results
 
 weights:
-	gh release download weights --pattern 'runs-weights.tar' --clobber
+	curl -fL -o runs-weights.tar https://github.com/abhaymettu/surprise-meter/releases/download/weights/runs-weights.tar
 	tar xf runs-weights.tar && rm runs-weights.tar
 
 # Everything from nothing: train every model, measure it, draw it. Days on one Mac. Safe to stop and rerun.
